@@ -1,0 +1,30 @@
+
+#turbo 20
+
+#include IP_Macro_Actions.inc
+#include IP_Macro_Auto.inc
+#include IP_Macro_Commands.inc
+#include IP_Macro_Events.inc
+#include IP_Macro_Setup.inc
+
+#include IP_Templates.inc
+
+sub Main() {
+	
+	/call "Setup"
+	/call "Automation_Setup"
+
+	/echo IP loaded.
+
+	:Main
+
+	/call "Check_Events"
+	/call "Check_Actions"
+	/call "Automation_Loop"
+	
+	/delay 1
+
+	/goto :Main
+
+	/return
+}
