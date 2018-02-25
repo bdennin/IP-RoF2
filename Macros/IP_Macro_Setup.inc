@@ -13,35 +13,31 @@ sub Setup() {
   /stick load
 
   /attack off
-  /stick off
 
   /return
 }
 
 sub Setup_Vars() {
 
-  /if (!${Defined[gl_follow_name]}) /declare gl_follow_name string global 0
- 
-  /if (!${Defined[gl_follow_ID]}) /declare gl_follow_ID int   global  0
-  /if (!${Defined[gl_kill_ID]}) /declare gl_kill_ID int   global  0
-  /if (!${Defined[gl_assist_ID]}) /declare gl_assist_ID int   global  0
-  /if (!${Defined[gl_pettid]})    /declare gl_pettid    int   global  0
-  
-  /if (!${Defined[gl_incmbt]})        /declare gl_incmbt        bool global false
-  /if (!${Defined[gl_is_following]})  /declare gl_is_following  bool global false
-  /if (!${Defined[gl_ismedg]})        /declare gl_ismedg        bool global false
+  /if (!${Defined[gl_follow_name]})   /declare gl_follow_name   string  global 0
+  /if (!${Defined[gl_follow_ID]})     /declare gl_follow_ID     int     global 0
+  /if (!${Defined[gl_kill_ID]})       /declare gl_kill_ID       int     global 0
+  /if (!${Defined[gl_assist_ID]})     /declare gl_assist_ID     int     global 0
+  /if (!${Defined[gl_is_following]})  /declare gl_is_following  bool    global false
+  /if (!${Defined[gl_is_medding]})    /declare gl_is_medding    bool    global false
+  /if (!${Defined[gl_in_combat]})     /declare gl_in_combat     bool    global false
 
   /declare gl_settings_file   string  outer   "Settings\Settings.ini"
-  /declare gl_bot_file        string  outer   "Bots\${MacroQuest.Server}_${Me.Name}.ini"  
-  /declare gl_curzon          string  outer   0
-  /declare gl_splset          string  outer   0
+  /declare gl_bot_file        string  outer   "Bots\${MacroQuest.Server}_${Me.Class.ShortName}_${Me.Name}.ini"
+  /declare gl_window_file     string  outer   "Data\Window_Names.ini"
+  /declare gl_current_zone    string  outer   0
+  /declare gl_spell_set_name  string  outer   0
   /declare gl_gate_item       string  outer   0
 
   /declare gl_cmbtmr  timer   outer   0s
-  /declare gl_dmgtmr  timer   outer   0s
+  /declare gl_damage_taken_timer  timer   outer   0s
   /declare gl_spldly  timer   outer   0s
   /declare gl_petdly  timer   outer   0s
-  /declare gl_agrtmr  timer   outer   0s
 
   /declare gl_comdis  float   outer 0.0
   /declare gl_rngdis  float   outer 0.0
@@ -49,14 +45,12 @@ sub Setup_Vars() {
   /declare gl_ghldis  float   outer 0.0
   /declare gl_lshdis  float   outer 0.0
   /declare gl_foldis  float   outer 0.0
-  /declare gl_assdis  float   outer 0.0
   /declare gl_spkdis  float   outer 0.0
 
   /declare gl_engpct  int   outer   0
   /declare gl_tgtpct  int   outer   0
   
   /declare gl_rezflg  bool  outer   false
-  /declare gl_isastg  bool  outer   false
   /declare gl_helpet  bool  outer   true
   /declare gl_is_aoe_active bool outer false
   /declare gl_heloth  bool  outer   false
@@ -64,25 +58,24 @@ sub Setup_Vars() {
 
   /if (!${Ini[${gl_settings_file}].Length}) {
 
-    /ini ${gl_settings_file} "Assists"  "Engage_Percent"      "97"
+    /ini ${gl_settings_file} "Assists"  "Engage_Percent"            "97"
 
-    /ini ${gl_settings_file} "Spells"     "Spell_Set_Name"      "jim"
-    /ini ${gl_settings_file} "Spells"     "Gate_Item_Name"      "Boots of the Nexus"
+    /ini ${gl_settings_file} "Spells"     "Spell_Set_Name"          "jim"
+    /ini ${gl_settings_file} "Spells"     "Gate_Item_Name"          "Boots of the Nexus"
 
     /ini ${gl_settings_file} "Distances"  "Communication_Distance"  "2000.0"
     /ini ${gl_settings_file} "Distances"  "Ranged_Attack_Distance"  "125.0"
     /ini ${gl_settings_file} "Distances"  "Spell_Casting_Distance"  "100.0"
     /ini ${gl_settings_file} "Distances"  "Group_Heal_Distance"     "50.0"
     /ini ${gl_settings_file} "Distances"  "Follow_Leash_Distance"   "20.0"
-    /ini ${gl_settings_file} "Distances"  "Follow_Distance"       "10.0"
-    /ini ${gl_settings_file} "Distances"  "Assist_Stick_Distance"   "8.0"
-    /ini ${gl_settings_file} "Distances"  "Speak_Distance"      "5.0"
+    /ini ${gl_settings_file} "Distances"  "Follow_Distance"         "10.0"
+    /ini ${gl_settings_file} "Distances"  "Speak_Distance"          "5.0"
   }
 
-  /varset gl_engpct ${Ini[${gl_settings_file},"Assists","Engage_Percent"]}
+  /varset gl_engpct         ${Ini[${gl_settings_file},"Assists","Engage_Percent"]}
 
-  /varset gl_splset     ${Ini[${gl_settings_file},"Spells","Spell_Set_Name"]}
-  /varset gl_gate_item  ${Ini[${gl_settings_file},"Spells","Gate_Item_Name"]}
+  /varset gl_spell_set_name ${Ini[${gl_settings_file},"Spells","Spell_Set_Name"]}
+  /varset gl_gate_item      ${Ini[${gl_settings_file},"Spells","Gate_Item_Name"]}
 
   /varset gl_comdis ${Ini[${gl_settings_file},"Distances","Communication_Distance"]}
   /varset gl_rngdis ${Ini[${gl_settings_file},"Distances","Ranged_Attack_Distance"]}
@@ -90,7 +83,6 @@ sub Setup_Vars() {
   /varset gl_ghldis ${Ini[${gl_settings_file},"Distances","Group_Heal_Distance"]}
   /varset gl_lshdis ${Ini[${gl_settings_file},"Distances","Follow_Leash_Distance"]}
   /varset gl_foldis ${Ini[${gl_settings_file},"Distances","Follow_Distance"]}
-  /varset gl_assdis ${Ini[${gl_settings_file},"Distances","Assist_Stick_Distance"]}
   /varset gl_spkdis ${Ini[${gl_settings_file},"Distances","Speak_Distance"]}
 
   /return
@@ -106,8 +98,8 @@ sub Setup_Class() {
   /declare gl_shdsht    bool  outer
   /declare gl_shdmed    bool  outer
   
-  /declare gl_cbtabs[6]   string  outer
-  /declare gl_nmabls    int   outer
+  /declare gl_combat_abilities[6]   string  outer
+  /declare gl_num_abilities    int   outer
   
   /declare gl_ghlspl    string  outer
   /declare gl_ghlgem    string  outer
@@ -176,9 +168,9 @@ sub Setup_Class() {
     
     /if (${Bool[${iter}]}) {
 
-      /varset gl_cbtabs[${i}] ${iter}
+      /varset gl_combat_abilities[${i}] ${iter}
 
-      /varset gl_nmabls ${i}
+      /varset gl_num_abilities ${i}
     }
 
   /next i
@@ -240,6 +232,8 @@ sub Setup_Class() {
     /varset iter ${Ini[${gl_bot_file},"Constant_Buffs","Constant_Buff_Spell#${i}"]}
   
     /if (${Bool[${iter}]}) {
+
+      /echo loading buffspell
 
       /varset gl_const_buffs[${i},1] "${Ini[${gl_bot_file},"Constant_Buffs","Constant_Buff_Spell#${i}"]}"
       /varset gl_const_buffs[${i},2] "${Ini[${gl_bot_file},"Constant_Buffs","Constant_Buff_Gem#${i}"]}"
@@ -386,7 +380,6 @@ sub Check_Plugins() {
     
     /if (!${Cast.Active}) /endmacro
   }
-
 
   /return
 }

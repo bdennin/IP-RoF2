@@ -15,9 +15,11 @@ sub Check_Events() {
 	/doevents Disband
 	/doevents End_Enrage
 	/doevents End_Macro
+	/doevents Find_Window_Text
 	/doevents Follow
 	/doevents Gate
 	/doevents Invis
+	/doevents Invite_Instance
 	/doevents Loot
 	/doevents Med
 	/doevents PetAssist
@@ -90,46 +92,30 @@ sub Event_Assist(string line, string sender, int target_ID) {
 #event Buff_Request "#1# tells the group, '$buffs#*#"
 sub Event_Buff_Request(string line, string buff_target) {
 
-	/bc '${buff_target}' ID ${Spawn['${buff_target}'].ID}
+	/declare buff_target_ID 	int local -1
+	/declare i 									int local
 
-	/call Buff ${Spawn["${buff_target}"].ID}
+	/for i 1 to 100
+
+		/if (${buff_target.Find[${NearestSpawn[${i}]}]}) {
+			/varset buff_target_ID ${NearestSpawn[${i}].ID}
+			/call Buff ${buff_target_ID}
+		}
+
+	/next i
+
+	/if (${buff_target_ID} == -1) {
+
+		/bc 'Could not find buff target: ${buff_target}'
+	}
 
 	/return
 }
 
 #event Buff "<#1#> buffs on #2#"
-sub Event_Buff(string line, string sender, int ID) {
-
-	/if (${gl_num_comm_buffs} == 0) /return
-
-	/if (${Spawn[PC ${sender}].ID} && ${Spawn[${sender}].Distance} < ${gl_comdis}) {
-
-		/if (${Spawn[ID ${ID}].ID} && ${Spawn[ID ${ID}].Distance} < ${gl_spldis}) {
-
-			/bc Buffing ${Spawn[ID ${ID}].Name}.
-
-			/declare i int local
-
-			/for i 1 to ${gl_num_comm_buffs}
-
-				:WaitMana
-
-				/if (${Me.CurrentMana} < ${Spell[${gl_comm_buffs[${i},1]}].Mana} + 300) {
-
-					/if (!${Me.Sitting}) /sit
-					/delay 6s
-					/goto :WaitMana
-				}
-
-				/call Cast ${gl_comm_buffs[${i},1]} ${gl_comm_buffs[${i},2]} ${ID}
-
-			/next i
-
-			/loadspells ${gl_splset}
-
-			/bc Done buffing ${Spawn[ID ${ID}].Name}.
-		}
-	} 
+sub Event_Buff(string line, string sender, int target_ID) {
+	
+	/call Buff ${target_ID}
 
 	/return
 }
@@ -172,11 +158,11 @@ sub Event_Cure(string line, string name) {
 }
 
 #event Debuff "<#*#> debuffs on #1#"
-sub Event_Debuff(string line, int ID) {
+sub Event_Debuff(string line, int target_ID) {
 
 	/if (${gl_num_debuffs} == 0) /return 
 
-	/if (${Spawn[ID ${ID}].ID}) {
+	/if (${Spawn[ID ${target_ID}].ID}) {
 
 		/interrupt
 
@@ -184,7 +170,7 @@ sub Event_Debuff(string line, int ID) {
 
 		/for i 1 to ${gl_num_debuffs}
 
-			/call Cast ${gl_debuffs[${i},1]} ${gl_debuffs[${i},2]} ${ID}
+			/call Cast ${gl_debuffs[${i},1]} ${gl_debuffs[${i},2]} ${target_ID}
 
 		/next i
 	}
@@ -218,10 +204,35 @@ sub Event_End_Macro(string line) {
 	/return
 }
 
-#event Follow "<#*#> follow #1#"
-sub Event_Follow(string line, int ID) {
+#event Find_Window_Text "<#*#> text #1#"
+sub Event_Find_Window_Text(string line, string text) {
 
-	/call Follow ${ID}
+	/declare i 						int 		local 1
+	/declare window_name 	string 	local ""
+
+	/echo "Searching for ${text}..."
+
+	:Iterate
+
+  /varset window_name ${Ini[${gl_window_file},"Window_Names","Window_Name#${i}"]}
+
+	/if (${window_name.NotEqual[NULL]}) {
+
+		/if (${Window[${window_name}].Text.Find[${text}]}) /echo ${window_name} contains ${text}.
+
+		/varcalc i ${i} + 1
+		/goto :Iterate
+	}
+
+	/echo "Search complete."
+
+	/return
+}
+
+#event Follow "<#*#> follow #1#"
+sub Event_Follow(string line, int follow_ID) {
+
+	/call Follow ${follow_ID}
 	
 	/return
 }
@@ -257,6 +268,38 @@ sub Event_Invis(string line) {
 	/return
 }
 
+#event Invite_Instance "<#1#> inst"
+sub Event_Invite_Instance(string line, string inviter) {
+
+	/if (${Me.Name.Equal[${inviter}]}) {
+
+	  /declare cncbts   string  local ${NetBots.Client}
+	  /declare netbot 	string 	local 
+	  /declare i        int     local
+
+	  /for i 1 to ${NetBots.Counts} 
+	    
+	    /varset netbot ${cncbts.Arg[${i}]}
+
+	    /if (${NetBots[${netbot}].ID} != ${Me.ID}) {
+	
+		    /bct ${netbot} //notify LargeDialogWindow LDW_OKButton leftmouseup
+		    /delay 1
+	
+	    	/say #invite ${netbot}
+
+	    	/delay 1
+		    /bct ${netbot} //notify LargeDialogWindow LDW_YesButton leftmouseup
+	    } 
+
+	    :ClickYes
+	    
+	  /next i
+	}
+
+	/return
+}
+
 #event Loot "<#*#> loot"
 sub Event_Loot(string line) {
 
@@ -272,7 +315,7 @@ sub Event_Loot(string line) {
 
 			/tar ID ${NearestSpawn[Corpse ${Me.Name}].ID}
 
-			/delay 5
+			/delay 10
 
 			/corpse
 
@@ -330,17 +373,17 @@ sub Event_Med(string line) {
 
 	/if (${gl_shdmed}) {
 
-		/if (${gl_ismedg}) {
+		/if (${gl_is_medding}) {
 
 			/stand
 		
-			/varset gl_ismedg false
+			/varset gl_is_medding false
 
 			/bc I am no longer meditating.
 
 		} else {
 
-			/varset gl_ismedg true
+			/varset gl_is_medding true
 
 			/bc I am meditating.
 		}
@@ -350,15 +393,15 @@ sub Event_Med(string line) {
 }
 
 #event Rez "<#*#> rez on #1#"
-sub Event_Rez(string line, int ID) {
+sub Event_Rez(string line, int target_ID) {
 	
 	/if (${Me.Class.Name.Equal["Cleric"]}) {
 
-		/if (${Spawn[ID ${ID}].Distance} < ${gl_spldis}) {
+		/if (${Spawn[ID ${target_ID}].Distance} < ${gl_spldis}) {
 
-			/if (${Spawn[ID ${ID}].Type.Equal["Corpse"]}) {
+			/if (${Spawn[ID ${target_ID}].Type.Equal["Corpse"]}) {
 				
-				/tar ID ${ID}
+				/tar ID ${target_ID}
 				/delay 2
 				/interrupt
 
@@ -384,21 +427,21 @@ sub Event_Rez(string line, int ID) {
 }
 
 #event Speak "<#*#> speak #1# #2#"
-sub Event_Speak(string line, int ID, string message) {	
+sub Event_Speak(string line, int speak_ID, string message) {	
 
-	/if (${Spawn[ID ${ID}].ID} && ${Spawn[ID ${ID}].Distance} < ${gl_comdis}) {
+	/if (${Spawn[ID ${speak_ID}].ID} && ${Spawn[ID ${speak_ID}].Distance} < ${gl_comdis}) {
 
 		:MoveToTarget
 
-		/if (${Spawn[ID ${ID}].ID} && ${Spawn[ID ${ID}].Distance} > ${gl_spkdis}) {
+		/if (${Spawn[ID ${speak_ID}].Distance} > ${gl_spkdis}) {
 
-			/moveto ID ${ID}
+			/moveto ID ${speak_ID}
 			/delay 5
 
 			/goto :MoveToTarget
 		}
 
-		/tar ID ${ID}
+		/tar ID ${speak_ID}
 		
 		/delay 1
 
@@ -463,7 +506,7 @@ sub Event_Take_Damage(string line) {
 			/delay 5
 			/stand
 
-			/if (${Target.ID} && ${gl_isastg} != 0) /attack on
+			/if (${Target.ID} && ${gl_assist_ID} != 0) /attack on
 
 		} else /if (${Me.AbilityReady["Hide"]}) {
 			
@@ -474,10 +517,10 @@ sub Event_Take_Damage(string line) {
 			/doability "Hide"
 			/delay 5
 
-			/if (${Target.ID} && ${gl_isastg} != 0) /attack on
+			/if (${Target.ID} && ${gl_assist_ID} != 0) /attack on
 		}
 
-		/varset gl_dmgtmr 0s
+		/varset gl_damage_taken_timer 0s
 	}
 
 	/return
@@ -492,21 +535,21 @@ sub Event_Use_Item(string line, string item_name) {
 }
 
 #event Warp "<#1#> warp #2#"
-sub Event_Warp(string line, string sender, int ID) {
+sub Event_Warp(string line, string sender, int warp_ID) {
 
 	/if (${Spawn[PC ${sender}].ID} == ${Me.ID}) /return
 
 	/if (${Spawn[PC ${sender}].ID}) {
 
-		/if (${Spawn[ID ${ID}].ID}) {
+		/if (${Spawn[ID ${warp_ID}].ID}) {
 
 			:WarpLoop
 
-			/if (${Spawn[ID ${ID}].Distance3D} > ${gl_wrpdis}) {
+			/if (${Spawn[ID ${warp_ID}].Distance3D} > ${gl_wrpdis}) {
 
 				/interrupt
 
-				/tar ID ${ID}
+				/tar ID ${warp_ID}
 				/delay 1
 				/warp t
 

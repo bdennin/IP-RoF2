@@ -12,14 +12,10 @@ sub Check_Actions() {
   /call Check_Med
   /if (${dbg}) /echo combat
   /call Check_Combat
-  /if (${dbg}) /echo loot
-  /call Check_Loot
-  /if (${dbg}) /echo yes
-  /call Check_Yes
   /if (${dbg}) /echo zone
   /call Check_Zone
 
-  /if (${Me.Moving} || ${gl_spldly} || ${Me.Invis} && !${gl_incmbt}) {
+  /if (${Me.Moving} || ${gl_spldly} || ${Me.Invis} && !${gl_in_combat}) {
     /return
   }
 
@@ -37,7 +33,7 @@ sub Check_Actions() {
   /if (${Macro.Return}) /return
   /if (${dbg}) /echo pheals
 
-  /if (${dbg}) /echo aoe
+  /if (${dbg}) /echo area
   /call Check_AoE
   /if (${Macro.Return}) /return
 
@@ -61,13 +57,12 @@ sub Check_Actions() {
   /if (${Macro.Return}) /return 
   
   /return
-}
+} 
 
-|-'Assist algorithm for physical damage dealers'
 sub Check_Assist() {
-  
-  |-'Check for kill target'
-  /if (${gl_kill_ID}) { 
+    
+  |-'Check for assist target'
+  /if (${gl_assist_ID}) { 
 
     |-'Melee routine'
     /if (${gl_is_melee}) {
@@ -90,10 +85,14 @@ sub Check_Assist() {
 
         /if (!${Stick.Active} || ${Stick.StickTarget} != ${gl_kill_ID}) {
 
-          /declare stick_distance float local 0.0
+          /declare stick_distance float local ${Spawn[ID ${gl_kill_ID}].MaxRangeTo}
 
-          /varcalc stick_distance ${Spawn[ID ${gl_kill_ID}].MaxRangeTo} - 1.0
-
+          /if (${stick_distance} > 40) {
+            /varcalc stick_distance ${Spawn[ID ${gl_kill_ID}].MaxRangeTo} * 0.33
+          } else {
+            /varcalc stick_distance ${Spawn[ID ${gl_kill_ID}].MaxRangeTo} * 0.60
+          }
+          
           /stick ID ${gl_kill_ID} ${stick_distance} moveback ${gl_assdir}
         }
 
@@ -104,9 +103,9 @@ sub Check_Assist() {
         /declare i    int   local
 
         |-'Do all ready abilities'
-        /for i 1 to ${gl_nmabls}
+        /for i 1 to ${gl_num_abilities}
 
-          /varset abl ${gl_cbtabs[${i}]}
+          /varset abl ${gl_combat_abilities[${i}]}
 
           /if (${Me.AbilityReady[${abl}]}) /doability ${abl}
 
@@ -115,25 +114,26 @@ sub Check_Assist() {
     }
   }
 
-  /if (${Target.ID}) {
-    |-'End combat'
+  |-'Check for kill target'
+  /if (${gl_kill_ID}) {
+
+    |-'Clear kill target if it is dead or not found'
     /if (!${Spawn[ID ${gl_kill_ID}].ID} || ${Spawn[ID ${gl_kill_ID}].Type.Equal["Corpse"]}) {
 
-      /varset gl_kill_ID    0
-      /varset gl_assist_ID  0
-      /varset gl_isastg     false
-
-      /if (${gl_isastg}) {
+      /if (${gl_assist_ID}) {
         
         /attack off
         /stick off
+        /squelch /target clear
       }
+
+      /varset gl_kill_ID    0
+      /varset gl_assist_ID  0
     }
 
   } else {
 
-    |-'Check if no one is being assisted'
-    /if (!${gl_assist_ID}) {
+    /if (${NetBots[${Me.Name}].Attacking}) {
 
       /if (${Target.Type.Equal["NPC"]}) {
 
@@ -141,7 +141,7 @@ sub Check_Assist() {
 
           /bc assist on ${Target.ID}
         }
-      }   
+      }
     }
   }
 
@@ -150,7 +150,7 @@ sub Check_Assist() {
 
 sub Check_Follow() {
   
-  /if (!${gl_isastg}) {
+  /if (!${gl_kill_ID}) {
 
     /if (${gl_is_following}) {
 
@@ -162,7 +162,7 @@ sub Check_Follow() {
 
             /if (${Spawn[ID ${gl_follow_ID}].Distance} > ${gl_lshdis}) {
               
-              /if (${Me.ID} == ${Target.ID}) //target clear
+              /if (${Me.ID} == ${Target.ID}) /squelch /target clear
 
               /stick ID ${gl_follow_ID} ${gl_foldis}
             }
@@ -184,12 +184,8 @@ sub Check_Follow() {
         /stick off
       }
     } else /if (${gl_follow_name.NotEqual["0"]}) {
-      
-      /if (${Spawn[${gl_follow_name}].ID} && ${Spawn[${gl_follow_name}].Distance} < ${gl_comdis}) {
 
-        /bc Follow target acquired.
-        /call Follow ${Spawn[${gl_follow_name}].ID}
-      }
+      /call Follow ${Spawn[${gl_follow_name}].ID}
     }
   }
   
@@ -198,20 +194,20 @@ sub Check_Follow() {
 
 sub Check_Med() {
   
-  /if (${gl_ismedg}) {
+  /if (${gl_is_medding}) {
     
-    /if (${gl_dmgtmr}) {
+    /if (${gl_damage_taken_timer}) {
 
       /if (${Me.Sitting}) /stand
 
       /return
     }
 
-    /if (${Stick.Stopped} || !${Stick.Active}) {
+    /if (!${gl_is_following} || ${Spawn[ID ${gl_follow_ID}].Distance} <= ${gl_lshdis})  {
 
-      /if (!${Me.Sitting} && !${Me.Moving}) {
+      /if (!${Me.Sitting}) {
 
-        /if (!${Corpse.Open} && ${Me.SpellReady[1]}) {
+        /if (!${Corpse.Open} && !${Me.Casting.ID}) {
 
           /sit 
         }
@@ -230,7 +226,7 @@ sub Check_Combat() {
 
   /declare cncbts   string  local   ${NetBots.Client}
   /declare netbot   string  local   0
-  /declare i      int   local
+  /declare i        int     local
 
   /for i 1 to ${NetBots.Counts} 
     
@@ -241,60 +237,33 @@ sub Check_Combat() {
       /if (${NetBots[${netbot}].CombatState} == 0) {
 
         /varset gl_cmbtmr 30s
-        /varset gl_incmbt true
+        /varset gl_in_combat true
 
         /return
       } 
     }
   /next i
 
-  /if (!${gl_cmbtmr}) /varset gl_incmbt false
+  /if (!${gl_cmbtmr}) /varset gl_in_combat false
 
   /return 
 }
 
-sub Check_Loot() {
-
-  /if (${gl_rezflg}) {
-
-    /call Event_Loot
-    /varset gl_rezflg 0
-  }
-
-  /return
-}
-
-sub Check_Yes() {
-
-  /if (${Window[ConfirmationDialogBox].Open}) {
-
-    /notify ConfirmationDialogBox CD_Yes_Button leftmouseup
-    /varset gl_rezflg 1
-  }
-
-  /return
-}
-
 sub Check_Zone() {
   
-  /if (${gl_curzon.NotEqual[${Zone.Name}]}) {
+  /if (${gl_current_zone.NotEqual[${Zone.Name}]}) {
 
-    /varset gl_curzon     ${Zone.Name}
-    /varset gl_kill_ID     0
-    /varset gl_follow_ID  0
-    /varset gl_incmbt     false
-    /varset gl_isastg     false
-    /varset m_autoing     false
+    /varset gl_current_zone   ${Zone.Name}
+    /varset gl_kill_ID        0
+    /varset gl_assist_ID      0
+    /varset gl_follow_ID      0
+    /varset gl_in_combat      false
+    /varset gl_is_auto_active false
 
     /stick off
     /attack off
 
     /if (${gl_iscstr}) /loadspells jim
-
-    /if (${Me.Class.Name.Equal["Shaman"]} && ${FindItem["Guise of the Deceiver"].InvSlot}) {
-
-      /itemnotify ${FindItem["Guise of the Deceiver"].InvSlot} rightmouseup
-    }
 
     /if (${Me.Class.Name.Equal["Bard"]}) {
 
@@ -486,14 +455,22 @@ sub Check_AoE() {
 
     /for i 1 to ${gl_num_aoes} 
 
+      /if (!${gl_is_aoe_active}) /return 0
+
       /varset aoe_spell ${gl_aoes[${i},1]}
       /varset aoe_gem   ${gl_aoes[${i},2]}
 
-      /call Cast ${aoe_spell} ${aoe_gem}
+      /call Memorize ${aoe_spell} ${aoe_gem}
+
+      /if (${Me.SpellReady[${aoe_spell}]}) {
+        
+        /call Cast ${aoe_spell} ${aoe_gem} ${Me.ID}
+      }
 
     /next i
 
     /return 1
+
   }
 
   /return 0
@@ -501,28 +478,28 @@ sub Check_AoE() {
 
 sub Check_Constant_Buffs() {
 
-  /if (${gl_nmcsbf} > 0) {
+  /if (${gl_num_const_buffs} > 0) {
 
-    /declare bufspl string  local
-    /declare bufgem string  local
-    /declare buftgt string  local
-    /declare buffid string  local
-    /declare i      int     local
+    /declare buff_spell_name  string  local
+    /declare buff_gem         string  local
+    /declare buff_target      string  local
+    /declare buff_spell_ID    string  local
+    /declare i                int     local
 
-    /for i 1 to ${gl_nmcsbf}
+    /for i 1 to ${gl_num_const_buffs}
 
-      /varset bufspl ${gl_cstbfs[${i},1]}
-      /varset bufgem ${gl_cstbfs[${i},2]}
-      /varset buftgt ${gl_cstbfs[${i},3]}
-      /varset buffid ${Spell[${bufspl}].ID}
+      /varset buff_spell_name ${gl_const_buffs[${i},1]}
+      /varset buff_gem        ${gl_const_buffs[${i},2]}
+      /varset buff_target     ${gl_const_buffs[${i},3]}
+      /varset buff_spell_ID   ${Spell[${buff_spell_name}].ID}
 
-      /if (${Spawn[PC ${buftgt}].ID} && ${Spawn[PC ${buftgt}].Distance} < ${gl_spldis}) {
+      /if (${Spawn[PC ${buff_target}].ID} && ${Spawn[PC ${buff_target}].Distance} < ${gl_spldis}) {
 
-        /if (${NetBots[${buftgt}].ID}) {
+        /if (${NetBots[${buff_target}].ID}) {
           
-          /if (!${NetBots[${buftgt}].Buff.Find[${buffid}]}) {
+          /if (!${NetBots[${buff_target}].Buff.Find[${buff_spell_ID}]}) {
 
-            /call Cast ${bufspl} ${bufgem} ${Spawn[PC ${buftgt}].ID}
+            /call Cast ${buff_spell_name} ${buff_gem} ${Spawn[PC ${buff_target}].ID}
 
             /return ${Macro.Return}
           }
@@ -543,9 +520,7 @@ sub Check_Pet_Summon() {
 
       /call Cast ${gl_petspl} ${gl_petgem} ${Me.ID}
 
-      /varset gl_pettid 0
-
-      /pet taunt off
+      /squelch /pet taunt off
 
       /return ${Macro.Return}
     }
@@ -556,26 +531,26 @@ sub Check_Pet_Summon() {
 
 sub Check_Pet_Buffs() {
 
-  /if (${gl_nmptbf} > 0) {
+  /if (${gl_num_pet_buffs} > 0) {
 
-    /declare bufspl string  local
-    /declare bufgem string  local
-    /declare buftgt string  local 
-    /declare buffid string  local
-    /declare i      int   local
-    
-    /for i 1 to ${gl_nmptbf}
+    /declare buff_spell_name  string  local
+    /declare buff_gem         string  local
+    /declare buff_target      string  local
+    /declare buff_spell_ID    string  local
+    /declare i                int     local
 
-      /varset bufspl ${gl_petbfs[${i},1]}
-      /varset bufgem ${gl_petbfs[${i},2]}
-      /varset buftgt ${gl_petbfs[${i},3]}
-      /varset buffid ${Spell[${bufspl}].ID}
+    /for i 1 to ${gl_num_pet_buffs}
 
-      /if (${NetBots[${buftgt}].PetID}) {
+      /varset buff_spell_name ${gl_pet_buffs[${i},1]}
+      /varset buff_gem        ${gl_pet_buffs[${i},2]}
+      /varset buff_target     ${gl_pet_buffs[${i},3]}
+      /varset buff_spell_ID   ${Spell[${buff_spell_name}].ID}
+
+      /if (${NetBots[${buff_target}].PetID}) {
         
-        /if (!${NetBots[${buftgt}].PetBuff.Find[${buffid}]}) {
+        /if (!${NetBots[${buff_target}].PetBuff.Find[${buff_spell_ID}]}) {
         
-          /call Cast ${bufspl} ${bufgem} ${NetBots[${buftgt}].PetID}
+          /call Cast ${buff_spell_name} ${buff_gem} ${NetBots[${buff_target}].PetID}
 
           /return ${Macro.Return}
         }
@@ -590,7 +565,7 @@ sub Check_Pet_Buffs() {
 
 sub Check_Cannibalize() {
 
-  /if (${gl_iscstr} && ${gl_incmbt}) {
+  /if (${gl_iscstr} && ${gl_in_combat}) {
 
     /if (${Me.PctMana} < 90 && ${Me.PctHPs} > 60) {
         
@@ -622,7 +597,7 @@ sub Check_Nuke() {
         
     /if (${gl_num_nukes} > 0) {
 
-      /if (${Spawn[ID ${gl_kill_ID}].LineOfSight} && !${gl_dmgtmr}) {
+      /if (${Spawn[ID ${gl_kill_ID}].LineOfSight} && !${gl_damage_taken_timer}) {
 
         /declare nuke_spell string  local
         /declare nuke_gem   string  local

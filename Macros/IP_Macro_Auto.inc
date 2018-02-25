@@ -2,314 +2,120 @@
 
 sub Automation_Setup() {
 	
-	/declare m_packleader		string 	outer "Rancor"
+	/declare gl_wait_timer 							timer 	outer 0.0
 
-	/declare m_relocatetimer 	timer	outer 1m
-	/declare m_bufftimer		timer 	outer 1000m
+	/declare gl_pack_leader						string 	outer "Rancor"
+	/declare gl_friendly_warp_target 	string 	outer "Blaze"
+	
+	/declare gl_is_auto_active 				bool 		outer	false
 
-	/declare m_begmed 			int		outer 20
-	/declare m_endmed 			int		outer 90
-	/declare m_x 				int 	outer 0
-	/declare m_y 				int 	outer 0
-	/declare m_z 				int 	outer 0
-	/declare m_lastx 			int 	outer 0
-	/declare m_lasty 			int 	outer 0
-	/declare m_lastz 			int 	outer 0
-	/declare m_numoors 			int 	outer 0
-
-	/declare m_autoing 			bool 	outer false
-	/declare m_medding 			bool  	outer false	
 
 	/return
 }
 
 sub Automation_Loop() {
 
-	/if (${Me.Name.NotEqual[${m_packleader}]}) /return
+	/declare target_ID 	int local 0
+	/declare i 					int local 0
 
-	/doevents Auto
-	/doevents Combat
-	/doevents OOR	
-	/doevents Whisper
+	/doevents Auto_Enable
 
-	/if (!${m_autoing}) /return
+	/if (${Me.Name.NotEqual[${gl_pack_leader}]}) /return
 
-	/if (!${m_relocatetimer} || ${m_numoors} > 9 && !${m_medding})  {
+	/if (${gl_is_auto_active}) {
 
-		/echo Auto :: Relocating
-		/call Relocate
+		/call Gather_Targets
+
+		/varset gl_wait_timer 300.0
+
+		/tar ID ${NetBots[${gl_friendly_warp_target}].ID}
+		/warp t
+		/delay 30
+		/bc warp ${Me.ID}
+
+		:Loot4
+
+		/if (!${gl_wait_timer}) /return
+
+		/if (${NearestSpawn[1, Corpse].ID} && ${NearestSpawn[1, Corpse].Distance} < 50.0) {
+
+			/squelch /tar ID ${NearestSpawn[1, Corpse].ID}
+			/squelch /warp t
+			/loot
+			/delay 3
+
+			/for i 1 to ${Corpse.Items} 
+
+				/if (${Corpse.Item[${i}].Name.Find["Token"]}) {
+
+					/itemnotify loot${i} rightmouseup
+					/echo it has a shiny!
+					/delay 4
+				}
+
+			/next i
+				
+			/notify LootWnd DoneButton leftmouseup
+			/goto :Loot
+		}
+	}
+
+	/if (${gl_wait_timer}) {
+		/echo delaying for a sec
+
+		/delay 10
+		/goto :Loot
+	}
+
+	/return
+}
+
+sub Gather_Targets() {
+
+	/declare i 						int local 0
+	/declare num_gathered int local 0
+	/declare num_targets 	int local 65
+	/declare target_ID 		int local 0
+	
+	/if (${SpawnCount} < ${num_targets}) {
+		/echo Waiting for enemies.
+		/delay 30
 		/return
 	}
 
-	/call Check_Auto_Nearby
-	/if (${Macro.Return} == 1) /return
-
-	/call Check_Auto_Med
-	/if (${Macro.Return} == 1) /return
-
-	/call Check_Auto_Buffs
-	/if (${Macro.Return} == 1) /return
-
-	/call Move
-
-	/return
-}
-
-sub Check_Auto_Nearby() {
-
-	/if (${NearestSpawn[NPC].Distance} < 30) {
-
-		/tar ID ${NearestSpawn[NPC].ID}
-
-		/delay 1
-
-		/stick ID ${Target.ID} ${gl_assdis}
-
-		/bc assist on ${Target.ID}
-
-		/attack on
-
-		/delay 3s
-
-		/return 1
-	} 
-
-	/tar ID ${NearestSpawn[NPC].ID}
-	/delay 1
-	/face
-
-	/return	0
-}
-
-sub Check_Auto_Med() {
-
-	/ECHO CHECKIN MED
-
-	/declare cnctdb 	string 	local 	${NetBots.Client}
-	/declare netbot 	string 	local 	0
-	/declare manpct		int 	local 	0
-	/declare bothps		int 	
-	/declare i 			int 	local 	0
-
-	/if (${m_medding}) {
-
-		/for i 1 to ${NetBots.Counts} 
-
-			/varset netbot ${cnctdb.Arg[${i}]}
-			/varset manpct ${NetBots[${netbot}].PctMana}
-
-			/if (${NetBots[${netbot}].Class.Name.NotEqual["Bard"]} && ${manpct} != 0 && ${manpct} < ${m_endmed}) {
-
-				/return 1
-			}
-
-		/next i
-
-		/echo Auto :: Ending meditation.
-		/varset m_medding false
-		/varset gl_ismedg false
-	
-	} else {
-
-		/for i 1 to ${NetBots.Counts} 
-
-			/varset netbot ${cnctdb.Arg[${i}]}
-			/varset manpct ${NetBots[${netbot}].PctMana}
-
-			/ECHO ${netbot} ${manpct}
-
-			/if (${manpct} > 0 && ${manpct} < ${m_begmed}) {
-
-				/echo Auto :: Beginning meditation.
-
-				/varset m_medding true
-				/varset gl_ismedg true
-				/return 1
-			}
-
-		/next i
-	} 
-
-	/return 0
-}
-
-sub Check_Auto_Buffs() {
-	
-	/if (!${m_bufftimer}) {
-
-		/echo Auto :: Requesting buffs.
-
-		/varset m_bufftimer 30m
-
-		/bc buffs on ${Me.ID}
-
-		/delay 30s
-	}
-
-	/return 0
-}
-
-sub Move() {
-
-	/varset m_lastx ${m_x}
-	/varset m_lasty ${m_y}
-	/varset m_lastz ${m_z}
-
-	/varset m_x ${Me.X}
-	/varset m_y ${Me.Y}
-	/varset m_z ${Me.Z}
-
-	/if (${Math.Calc[${Math.Abs[${m_x} - ${m_lastx}]} + ${Math.Abs[${m_y} - ${m_lasty}]}]} < 20) /call Turn_Rand
-
-	/call Move_Forward 30 false
-
-	/return
-}
-
-sub Relocate() {
-
-	/attack off
-	//target clear
-	/bc follow ${Me.ID}
-
-	/call Turn_Rand
-	/call Move_Forward 200 true
-
-	/varset m_relocatetimer 1m
-	/varset m_numoors 0
-
-	/return
-}
-
-sub Turn_Rand() {
-
-	/declare rand int local
-
-	/varset rand ${Math.Rand[5]}
-
-	/if (${rand} == 0) /call Turn_Right
-	/if (${rand} == 1) /call Turn_Left
-	/if (${rand} == 2) /call Turn_Around
-	/if (${rand} == 3) /call Turn_Right
-	/if (${rand} == 4) /call Turn_Left
-
-	/return
-}
-
-sub Turn_Right() {
-
-	/keypress d hold
-	/call Steady ${Math.Rand[10]}
-	/keypress d
-	/call Move_Forward ${Math.Rand[25]}
-
-	/return
-}
-
-sub Turn_Left() {
-
-	/keypress a hold
-	/call Steady ${Math.Rand[10]} 
-	/keypress a
-	/call Move_Forward ${Math.Rand[25]}
-
-	/return
-}
-
-sub Turn_Around() {
-
-	/keypress a hold
-	/call Steady 2
-	/keypress a
-
-	/return
-}
-
-sub Move_Forward(int delay, bool break) {
-
-	/keypress w hold
-	/call Steady ${delay} ${break}
-	/keypress w
-
-	/return
-}
-
-sub Steady(int delay, bool break) {
-
-	/declare i int local
-
-	/for i 1 to ${delay}
-
-		/delay 1
-
-		/if (!${break} && ${NearestSpawn[NPC].Distance} < 100) /return
+	/for i 1 to ${num_targets} 
+
+		/tar ID ${NearestSpawn[${i}, NPC].ID}
+		/delay 3
+		/warp t
+		/echo ${i}
 
 	/next i
 
+	/echo done
+	:Done
+
 	/return
 }
 
-#event Auto "<#*#> auto"
-sub Event_Auto(string line) {
+#event Auto_Enable "<#*#> auto"
+sub Event_Auto_Enable(string line) { 
 
-	/if (!${m_autoing}) {
+	/if (${gl_is_auto_active}) {
 
-		/varset m_autoing true
+		/varset gl_is_auto_active false
+		/varset gl_is_aoe_active 	false
 
-		/if (${Me.Name.Equal[${m_packleader}]}) {
-
-			/bc follow ${Me.ID}
-			/varset gl_ismedg false
-		}
-
-		/echo Automation enabled.
+	} else {
 		
-		} else {
+		/varset gl_is_auto_active true
+		/varset gl_is_aoe_active 	true
 
-			/if (${gl_iscstr}) {
+		/if (${gl_shdmed}) /varset gl_is_medding true
 
-				/varset gl_ismedg true
-
-			} else {
-
-				/varset gl_ismedg false
-			}
-
-			/varset m_autoing 	false
-			/varset gl_incmbt 	false
-			/varset gl_kill_ID 	0
-			/stick off
-			/attack off
-
-			/echo Automation disabled.
+		/squelch /hidecorpse all
+		/squelch /hidecorpse looted
 	}
-
-	/return
-}
-
-#event Combat "You #*# a #*# damage."
-#event Combat "#*# YOU for #*# points of damage."
-sub Event_Combat(string line) {
-
-	/varset m_numoors 0
-	/varset m_relocatetimer 1m
-
-	/return
-}
-
-#event OOR "#*# see your target."
-#event OOR "#*# too far away, get closer!"
-sub Event_OOR(string line) {
-
-	/varcalc m_numoors ${m_numoors} + 1
-
-	/return
-}
-
-#event Whisper "#*#tells you,#*#"
-sub Event_Whisper(string line) {
-
-	|/if (${Me.Name.Equal[${m_packleader}]}) /beep
 
 	/return
 }

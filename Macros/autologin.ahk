@@ -1,25 +1,49 @@
-﻿
+
 ;Set this equal to your MQ2 directory
-ippath = C:\Users\Jimbob\Downloads\IP-ROF2
+ippath = C:\Users\brand\Documents\GitHub\IP-RoF2
+eqpath = C:\ROF2
 
-numclients := 6
+numclients := 0
 
-loop, %numclients%
+Loop
 {
-  run, eqgame.exe patchme /login:bdens0%A_Index%, D:\ROF2
+  filereadline, line, logins.txt, %a_index%
+  
+  if ErrorLevel
+    break
+  
+  vals := strsplit(line, " ")
+
+  login := % vals[1]
+
+  run, eqgame.exe patchme /login:%login%, %eqpath%
+
+  numclients++
+
   sleep, 1000
 }
 
-sleep, 12000
+sleep, 6000
 
 winget, windows, list, EverQuest
 
-Loop, %windows%
+Loop %windows%
 {
-  winactivate, % "ahk_id" windows%A_Index%
-  sendinput, angel123
+  filereadline, line, logins.txt, %a_index%
+  
+  if ErrorLevel
+    break
+  
+  vals := strsplit(line, " ")
+
+  pass := % vals[2]
+
+  winactivate, % "ahk_id" windows%a_index%
+  sleep, 100
+  sendinput, %pass%
+  sleep, 100
   sendinput, {enter}
-  sleep, 1000
+  sleep, 800
 }
 
 run, EQBCServer.exe, %ippath%

@@ -4,15 +4,13 @@ sub Assist(int sender_ID, int target_ID) {
 	|-'Only accept kill targets from nearby players in same zone'
 	/if (${Spawn[ID ${sender_ID}].ID} && ${Spawn[ID ${sender_ID}].Distance} < ${gl_comdis}) {
 
-		|-'Todo: Add more specific filter'
 		|-'Only kill NPC'
 		/if (${Spawn[ID ${target_ID}].Type.Equal["NPC"]}) {
 
-			|-'Set player that is to be assisted'
-			/varset gl_assist_ID ${sender_ID}
+			|-'Only set the assist for bots'
+			/if (${Me.ID} != ${sender_ID}) /varset gl_assist_ID ${sender_ID}
 
-			|-'Only set the kill target for bots'
-			/if (${Me.ID} != ${gl_assist_ID}) /varset gl_kill_ID ${target_ID} 
+			/varset gl_kill_ID ${target_ID} 
 
 			|-'Have pets attack'
 			/if (${Me.Pet.ID}) {
@@ -30,27 +28,36 @@ sub Assist(int sender_ID, int target_ID) {
 
 sub Buff(int buff_target_ID) {
 
-	/bc ${buff_target_ID}
+	/if (${gl_num_comm_buffs} == 0) /return
 
-	/declare i 	int local
-	/declare ID int local -1
+	/if (${Spawn[PC ${sender}].ID} && ${Spawn[${sender}].Distance} < ${gl_comdis}) {
 
-	/for i 1 to 100
+		/if (${Spawn[ID ${ID}].ID} && ${Spawn[ID ${ID}].Distance} < ${gl_spldis}) {
 
-		/if (${name.Find[${NearestSpawn[${i}]}]}) {
-			/varset ID ${NearestSpawn[${i}].ID}
-			/goto :FoundTarget
+			/bc Buffing ${Spawn[ID ${ID}].Name}.
+
+			/declare i int local
+
+			/for i 1 to ${gl_num_comm_buffs}
+
+				:WaitMana
+
+				/if (${Me.CurrentMana} < ${Spell[${gl_comm_buffs[${i},1]}].Mana} + 300) {
+
+					/if (!${Me.Sitting}) /sit
+					/delay 6s
+					/goto :WaitMana
+				}
+
+				/call Cast ${gl_comm_buffs[${i},1]} ${gl_comm_buffs[${i},2]} ${ID}
+
+			/next i
+
+			/loadspells ${gl_spell_set_name}
+
+			/bc Done buffing ${Spawn[ID ${ID}].Name}.
 		}
-
-	/next i
-
-	:FoundTarget
-
-	/if (${ID} != -1) {
-
-		/t ${Spawn[ID ${ID}].Name} Buffs incoming...
-		/bc buffs on ${ID}
-	}
+	} 
 
 	/return
 }
@@ -68,8 +75,12 @@ sub Camp() {
 	
 sub Cast(string spell_name, int gem_number, int target_ID) {
 	
-	/declare x float local ${Me.X}
-	/declare y float local ${Me.Y}
+	/declare x 					float local ${Me.X}
+	/declare y 					float local ${Me.Y}
+	/declare xdiff			float local 0.0
+	/declare ydiff			float local 0.0
+	/declare waitcount 	int 	local 0
+
 
 	/if (${Me.CurrentMana} < ${Spell[${spell_name}].Mana} * 1.3) {
 
@@ -84,42 +95,47 @@ sub Cast(string spell_name, int gem_number, int target_ID) {
 	/if (${gl_is_following} && ${Spawn[ID ${gl_follow_ID}].Distance} > ${gl_lshdis}) {
 
 		/bc Interrupting spell cast -- follow target needs me.
-
+		/squelch /target clear
 		/interrupt
-		
-		/if (${Me.Target.ID} == ${Me.ID}) //target clear
-
-		/stick ID ${gl_follow_ID} ${gl_foldis}
-
-		/varset gl_spldly 20
-
 		/return 0
 	}
 
 	/call Memorize "${spell_name}" ${gem_number} 	
 	/if (${Macro.Return}) /return 0
 
+	:Wait
+	
 	/if (!${Me.SpellReady[${spell_name}]}) {
 
-		/varset gl_spldly 20
-		
-		/return 0 
+		/if (${waitcount} < 20) {
+			
+			/varcalc waitcount ${waitcount} + 1
+			/delay 5
+			/goto :Wait
+
+		} else {
+
+			/bc Gave up waiting for ${spell_name} to be ready
+			/return 0
+		}
 	}
 
 	/bc Casting ${spell_name} on ${Spawn[ID ${target_ID}].Name}
 
-	/casting "${spell_name}|Gem${gem_number}" -maxtries|3 -targetid|${target_ID}
+	/if (${Me.Sitting}) /stand
 
+	/tar ID ${target_ID}
+	
+	/cast ${gem_number} 
 	/delay 5
 
 	:MonitorCasting
 
-	/if (${Cast.Status.Count["C"]} > 0) {
-				
+	/if (${Me.Casting.ID}) {
+		
 		/if (${Spawn[ID ${target_ID}].Type.Equal["Corpse"]}) {
 
 			/bc Interrupting spell cast -- target is a corpse.
-
 			/interrupt
 			/return 0
 		}
@@ -127,7 +143,6 @@ sub Cast(string spell_name, int gem_number, int target_ID) {
 		/if (${Spawn[ID ${target_ID}].Distance} > ${gl_spldis}) {
 
 			/bc Interrupting spell cast -- target is out of range.
-
 			/interrupt
 			/return 0
 		} 
@@ -135,15 +150,17 @@ sub Cast(string spell_name, int gem_number, int target_ID) {
 		/if (${gl_is_following} && ${Spawn[ID ${gl_follow_ID}].Distance} > ${gl_lshdis}) {
 
 			/bc Interrupting spell cast -- follow target needs me.
-
+			/squelch /target clear
 			/interrupt
 			/return 0
 		}
 
-		/if (${Me.X} != ${x} || ${Me.Y} != ${y}) {
+		/varcalc xdiff ${x} - ${Me.X}
+		/varcalc ydiff ${y} - ${Me.Y}
 
-			/bc I have moved from my casting position -- Interrupting.  (~X: )
+		/if (${xdiff} < -2.0 || ${xdiff} > 2.0 || ${ydiff} < -2.0 || ${ydiff} > 2.0) {
 
+			/bc I have moved from my casting position -- Interrupting. 
 			/interrupt
 			/return 0
 		}
@@ -158,36 +175,40 @@ sub Cast(string spell_name, int gem_number, int target_ID) {
 
 	} else {
 
-		/varset gl_spldly 50
 		/return 0
 	}
 }
 
 sub Follow(int follow_ID) {
 
+	|-'Never follow yourself'
 	/if (${follow_ID} == ${Me.ID}) {
 
 		/varset gl_follow_ID 0
 		/varset gl_is_following false
-		/varset gl_agrtmr 12s
-
 		/return
 	}
 
+
+	|-'Proximity check'
 	/if (${Spawn[ID ${follow_ID}].ID} && ${Spawn[ID ${follow_ID}].Distance} < ${gl_comdis}) {
 		
-		/varset gl_kill_ID 0
-		/varset gl_isastg false
+		|-'Do not follow corpses'
+		/if (!${Spawn[ID ${follow_ID}].Type.Equal["Corpse"]}) {
 
-		/interrupt
+			/varset gl_kill_ID 		0
+			/varset gl_assist_ID 	0
 
-		/attack off
+			/interrupt
 
-		/varset gl_is_following true
-		/varset gl_follow_ID ${follow_ID}
-		/varset gl_follow_name ${Spawn[ID ${gl_follow_ID}].Name}		
+			/attack off
 
-		/stick ID ${gl_follow_ID} ${gl_foldis}
+			/varset gl_is_following true
+			/varset gl_follow_ID ${follow_ID}
+			/varset gl_follow_name ${Spawn[ID ${gl_follow_ID}].Name}		
+
+			/stick ID ${gl_follow_ID} ${gl_foldis}
+		}
 	}
 
 	/return
@@ -209,8 +230,6 @@ sub Memorize(string spell_name, int gem_number) {
 			/goto :Memorizing
 		}
 		
-		/varset gl_spldly 15
-
 		/stand
 
 		/return 1
@@ -236,8 +255,6 @@ sub Use_Item(string item_name) {
 
 		/declare sleep_time float local
 
-		/echo Attempting to use ${FindItem[${item_name}].Name}
-		
 		/itemnotify ${FindItem[${item_name}].InvSlot} rightmouseup
 
 		/varcalc sleep_time ${FindItem[${item_name}].CastTime} + 0.5
