@@ -1,41 +1,40 @@
 
-sub Setup() {
+sub setup_macro() {
 
-  /call Setup_Vars
-  /call Setup_Class
-  /call Check_Plugins
+  /call setup_variables
+  /call setup_class
+  /call check_plugins
 
+  /squelch /filter mq on
   /squelch /tgb on
   /squelch /hidecorpse all
   /squelch /hidecorpse none
   /squelch /hidecorpse looted
-  /squelch /netfollow off
-  /stick load
+  /squelch /bccmd channel notes
+  /squelch /stick load
 
   /attack off
 
   /return
 }
 
-sub Setup_Vars() {
+sub setup_variables() {
 
-  /if (!${Defined[gl_follow_name]})   /declare gl_follow_name   string  global 0
-  /if (!${Defined[gl_follow_ID]})     /declare gl_follow_ID     int     global 0
+  /if (!${Defined[gl_follow_name]})   /declare gl_follow_name   string  global "0"
+  /if (!${Defined[gl_follow_id]})     /declare gl_follow_id     int     global 0
   /if (!${Defined[gl_kill_ID]})       /declare gl_kill_ID       int     global 0
   /if (!${Defined[gl_assist_ID]})     /declare gl_assist_ID     int     global 0
   /if (!${Defined[gl_is_following]})  /declare gl_is_following  bool    global false
   /if (!${Defined[gl_is_medding]})    /declare gl_is_medding    bool    global false
-  /if (!${Defined[gl_in_combat]})     /declare gl_in_combat     bool    global false
 
   /declare gl_settings_file   string  outer   "Settings\Settings.ini"
   /declare gl_bot_file        string  outer   "Bots\${MacroQuest.Server}_${Me.Class.ShortName}_${Me.Name}.ini"
   /declare gl_window_file     string  outer   "Data\Window_Names.ini"
-  /declare gl_current_zone    string  outer   0
-  /declare gl_spell_set_name  string  outer   0
-  /declare gl_gate_item       string  outer   0
+  /declare gl_current_zone    string  outer   ""
+  /declare gl_gate_item       string  outer   ""
 
-  /declare gl_cmbtmr  timer   outer   0s
-  /declare gl_damage_taken_timer  timer   outer   0s
+  /declare gl_combat_timer        timer   outer 0s
+  /declare gl_damage_taken_timer  timer   outer 0s
   /declare gl_spldly  timer   outer   0s
   /declare gl_petdly  timer   outer   0s
 
@@ -50,17 +49,16 @@ sub Setup_Vars() {
   /declare gl_engpct  int   outer   0
   /declare gl_tgtpct  int   outer   0
   
-  /declare gl_rezflg  bool  outer   false
-  /declare gl_helpet  bool  outer   true
+  /declare gl_rezflg        bool outer false
+  /declare gl_helpet        bool outer true
   /declare gl_is_aoe_active bool outer false
-  /declare gl_heloth  bool  outer   false
+  /declare gl_heloth        bool outer true
 
 
   /if (!${Ini[${gl_settings_file}].Length}) {
 
     /ini ${gl_settings_file} "Assists"  "Engage_Percent"            "97"
 
-    /ini ${gl_settings_file} "Spells"     "Spell_Set_Name"          "jim"
     /ini ${gl_settings_file} "Spells"     "Gate_Item_Name"          "Boots of the Nexus"
 
     /ini ${gl_settings_file} "Distances"  "Communication_Distance"  "2000.0"
@@ -72,10 +70,8 @@ sub Setup_Vars() {
     /ini ${gl_settings_file} "Distances"  "Speak_Distance"          "5.0"
   }
 
-  /varset gl_engpct         ${Ini[${gl_settings_file},"Assists","Engage_Percent"]}
-
-  /varset gl_spell_set_name ${Ini[${gl_settings_file},"Spells","Spell_Set_Name"]}
-  /varset gl_gate_item      ${Ini[${gl_settings_file},"Spells","Gate_Item_Name"]}
+  /varset gl_engpct    ${Ini[${gl_settings_file},"Assists","Engage_Percent"]}
+  /varset gl_gate_item "${Ini[${gl_settings_file},"Spells","Gate_Item_Name"]}"
 
   /varset gl_comdis ${Ini[${gl_settings_file},"Distances","Communication_Distance"]}
   /varset gl_rngdis ${Ini[${gl_settings_file},"Distances","Ranged_Attack_Distance"]}
@@ -88,18 +84,18 @@ sub Setup_Vars() {
   /return
 }
 
-sub Setup_Class() {
+sub setup_class() {
   
   /declare gl_assdir    string  outer
-  /declare gl_is_melee    bool  outer
-  /declare gl_ishelr    bool  outer
-  /declare gl_iscstr    bool  outer
-  /declare gl_istank    bool  outer
-  /declare gl_shdsht    bool  outer
-  /declare gl_shdmed    bool  outer
+  /declare gl_is_melee  bool    outer
+  /declare gl_ishelr    bool    outer
+  /declare gl_iscstr    bool    outer
+  /declare gl_istank    bool    outer
+  /declare gl_shdsht    bool    outer
+  /declare gl_shdmed    bool    outer
   
-  /declare gl_combat_abilities[6]   string  outer
-  /declare gl_num_abilities    int   outer
+  /declare gl_combat_abilities[6] string  outer
+  /declare gl_num_abilities    int outer
   
   /declare gl_ghlspl    string  outer
   /declare gl_ghlgem    string  outer
@@ -108,7 +104,7 @@ sub Setup_Class() {
 
   /declare gl_chlspl    string  outer
   /declare gl_chlgem    string  outer
-  /declare gl_chlpct    int   outer   
+  /declare gl_chlpct    int     outer   
 
   /declare gl_thlspl    string  outer
   /declare gl_thlgem    string  outer
@@ -121,8 +117,8 @@ sub Setup_Class() {
   /declare gl_petspl    string  outer
   /declare gl_petgem    string  outer
 
-  /declare gl_canni_spell    string  outer
-  /declare gl_canni_gem    int   outer
+  /declare gl_canni_spell string outer
+  /declare gl_canni_gem   int    outer
  
   /declare gl_nukes[4,3]        string outer
   /declare gl_aoes[5,3]         string outer
@@ -141,6 +137,8 @@ sub Setup_Class() {
 
   /if (!${Ini[${gl_bot_file}].Length}) {
     
+    /echo "First time setup for ${Me.Class.Name} on ${MacroQuest.Server}."
+
     /if (${Me.Class.Name.Equal["Shadow Knight"]}) {
 
       /call Init_Shadow_Knight
@@ -174,123 +172,205 @@ sub Setup_Class() {
     }
 
   /next i
-
-  /varset gl_ghlspl "${Ini[${gl_bot_file},"Group_Heal","Group_Heal_Spell"]}"
-  /varset gl_ghlgem "${Ini[${gl_bot_file},"Group_Heal","Group_Heal_Gem"]}"
-  /varset gl_ghlpct ${Ini[${gl_bot_file},"Group_Heal","Group_Heal_Percent"]}
-  /varset gl_nmghtg ${Ini[${gl_bot_file},"Group_Heal","Group_Heal_Targets"]}
-
-  /varset gl_chlspl "${Ini[${gl_bot_file},"Complete_Heal","Complete_Heal_Spell"]}"
-  /varset gl_chlgem "${Ini[${gl_bot_file},"Complete_Heal","Complete_Heal_Gem"]}"
-  /varset gl_chlpct ${Ini[${gl_bot_file},"Complete_Heal","Complete_Heal_Percent"]}
-
-  /varset gl_thlspl "${Ini[${gl_bot_file},"Target_Heal","Target_Heal_Spell"]}"
-  /varset gl_thlgem "${Ini[${gl_bot_file},"Target_Heal","Target_Heal_Gem"]}"
-  /varset gl_thlpct ${Ini[${gl_bot_file},"Target_Heal","Target_Heal_Percent"]}
-
-  /varset gl_hotspl "${Ini[${gl_bot_file},"Heal_Over_Time","Heal_Over_Time_Spell"]}"
-  /varset gl_hotgem "${Ini[${gl_bot_file},"Heal_Over_Time","Heal_Over_Time_Gem"]}"
-  /varset gl_hotpct ${Ini[${gl_bot_file},"Heal_Over_Time","Heal_Over_Time_Percent"]}
   
-  /varset gl_petspl "${Ini[${gl_bot_file},"Pet","Pet_Spell"]}"
-  /varset gl_petgem "${Ini[${gl_bot_file},"Pet","Pet_Gem"]}"
+  /varset iter "${Ini[${gl_bot_file},"Group_Heal","Group_Heal_Spell"]}"
+      
+  /if (${Bool[${iter}]}) {
+    /if (${Me.Book[${iter}]}) {
+      
+      /varset gl_ghlspl "${Ini[${gl_bot_file},"Group_Heal","Group_Heal_Spell"]}"
+      /varset gl_ghlgem "${Ini[${gl_bot_file},"Group_Heal","Group_Heal_Gem"]}"
+      /varset gl_ghlpct ${Ini[${gl_bot_file},"Group_Heal","Group_Heal_Percent"]}
+      /varset gl_nmghtg ${Ini[${gl_bot_file},"Group_Heal","Group_Heal_Targets"]}
+    } else {    
 
-  /varset gl_canni_spell "${Ini[${gl_bot_file},"Cannibalize","Cannibalize_Spell"]}"
-  /varset gl_canni_gem ${Ini[${gl_bot_file},"Cannibalize","Cannibalize_Gem"]}
+      /echo "${iter} not found in book. Ignoring..."
+    }
+  }
 
+  /varset iter "${Ini[${gl_bot_file},"Complete_Heal","Complete_Heal_Spell"]}"    
+  
+  /if (${Bool[${iter}]}) {
+    /if (${Me.Book[${iter}]}) {
+  
+      /varset gl_chlspl "${Ini[${gl_bot_file},"Complete_Heal","Complete_Heal_Spell"]}"
+      /varset gl_chlgem "${Ini[${gl_bot_file},"Complete_Heal","Complete_Heal_Gem"]}"
+      /varset gl_chlpct ${Ini[${gl_bot_file},"Complete_Heal","Complete_Heal_Percent"]}
+    } else {
+
+      /echo "${iter} not found in book. Ignoring..."
+    }
+  }
+  
+  /varset iter "${Ini[${gl_bot_file},"Target_Heal","Target_Heal_Spell"]}"
+  
+  /if (${Bool[${iter}]}) {
+    /if (${Me.Book[${iter}]}) {
+  
+      /varset gl_thlspl "${Ini[${gl_bot_file},"Target_Heal","Target_Heal_Spell"]}"
+      /varset gl_thlgem "${Ini[${gl_bot_file},"Target_Heal","Target_Heal_Gem"]}"
+      /varset gl_thlpct ${Ini[${gl_bot_file},"Target_Heal","Target_Heal_Percent"]}
+    } else {    
+
+      /echo "${iter} not found in book. Ignoring..."
+    }
+  }
+
+  /varset iter "${Ini[${gl_bot_file},"Heal_Over_Time","Heal_Over_Time_Spell"]}"
+      
+  /if (${Bool[${iter}]}) {
+    /if (${Me.Book[${iter}]}) {
+  
+      /varset gl_hotspl "${Ini[${gl_bot_file},"Heal_Over_Time","Heal_Over_Time_Spell"]}"
+      /varset gl_hotgem "${Ini[${gl_bot_file},"Heal_Over_Time","Heal_Over_Time_Gem"]}"
+      /varset gl_hotpct ${Ini[${gl_bot_file},"Heal_Over_Time","Heal_Over_Time_Percent"]}
+    } else {    
+
+      /echo "${iter} not found in book. Ignoring..."
+    }
+  }
+
+
+  /varset iter "${Ini[${gl_bot_file},"Pet","Pet_Spell"]}"
+
+  /if (${Bool[${iter}]}) {
+    /if (${Me.Book[${iter}]}) {
+      
+      /varset gl_petspl "${Ini[${gl_bot_file},"Pet","Pet_Spell"]}"
+      /varset gl_petgem "${Ini[${gl_bot_file},"Pet","Pet_Gem"]}"
+    } else {    
+
+      /echo "${iter} not found in book. Ignoring..."
+    }
+  }
+
+  /varset iter "${Ini[${gl_bot_file},"Cannibalize","Cannibalize_Spell"]}"
+
+  /if (${Bool[${iter}]}) {
+    /if (${Me.Book[${iter}]}) {
+  
+      /varset gl_canni_spell "${Ini[${gl_bot_file},"Cannibalize","Cannibalize_Spell"]}"
+      /varset gl_canni_gem ${Ini[${gl_bot_file},"Cannibalize","Cannibalize_Gem"]}
+    } else {    
+
+      /echo "${iter} not found in book. Ignoring..."
+    }
+  }
 
   /for i 1 to 4
     
-    /varset iter ${Ini[${gl_bot_file},"Nukes","Nuke_Spell#${i}"]}
-
+    /varset iter "${Ini[${gl_bot_file},"Nukes","Nuke_Spell#${i}"]}"
+   
     /if (${Bool[${iter}]}) {
+      /if (${Me.Book[${iter}]}) {
 
-      /varset gl_nukes[${i},1] "${Ini[${gl_bot_file},"Nukes","Nuke_Spell#${i}"]}"
-      /varset gl_nukes[${i},2] "${Ini[${gl_bot_file},"Nukes","Nuke_Gem#${i}"]}"
-  
-      /varset gl_num_nukes ${i}
+        /varset gl_nukes[${i},1] "${Ini[${gl_bot_file},"Nukes","Nuke_Spell#${i}"]}"
+        /varset gl_nukes[${i},2] "${Ini[${gl_bot_file},"Nukes","Nuke_Gem#${i}"]}"
+    
+        /varset gl_num_nukes ${i}
+      } else {
+
+        /echo "${iter} not found in book. Ignoring..."
+      }
     }
-
   /next i
 
   /for i 1 to 4
     
-    /varset iter ${Ini[${gl_bot_file},"Debuffs","Debuff_Spell#${i}"]}
-    
+    /varset iter "${Ini[${gl_bot_file},"Debuffs","Debuff_Spell#${i}"]}"
+       
     /if (${Bool[${iter}]}) {
+      /if (${Me.Book[${iter}]}) {
 
-      /varset gl_debuffs[${i},1] "${Ini[${gl_bot_file},"Debuffs","Debuff_Spell#${i}"]}"
-      /varset gl_debuffs[${i},2] "${Ini[${gl_bot_file},"Debuffs","Debuff_Gem#${i}"]}"
-  
-      /varset gl_num_debuffs ${i}
+        /varset gl_debuffs[${i},1] "${Ini[${gl_bot_file},"Debuffs","Debuff_Spell#${i}"]}"
+        /varset gl_debuffs[${i},2] "${Ini[${gl_bot_file},"Debuffs","Debuff_Gem#${i}"]}"
+    
+        /varset gl_num_debuffs ${i}
+      } else {
+
+        /echo "${iter} not found in book. Ignoring..."
+      }
     }
-
   /next i
 
   /for i 1 to 8
     
-    /varset iter ${Ini[${gl_bot_file},"Constant_Buffs","Constant_Buff_Spell#${i}"]}
+    /varset iter "${Ini[${gl_bot_file},"Constant_Buffs","Constant_Buff_Spell#${i}"]}"
+   
+    /if (${Bool[${iter}]}) {
+      /if (${Me.Book[${iter}]}) {
+
+        /varset gl_const_buffs[${i},1] "${Ini[${gl_bot_file},"Constant_Buffs","Constant_Buff_Spell#${i}"]}"
+        /varset gl_const_buffs[${i},2] "${Ini[${gl_bot_file},"Constant_Buffs","Constant_Buff_Gem#${i}"]}"
+        /varset gl_const_buffs[${i},3] "${Ini[${gl_bot_file},"Constant_Buffs","Constant_Buff_Target#${i}"]}"
+
+        /varset gl_num_const_buffs ${i}
+      } else {
+
+        /echo "${iter} not found in book. Ignoring..."
+      }
+    }
+  /next i
+
+  /for i 1 to 4
+    
+    /varset iter "${Ini[${gl_bot_file},"Command_Buffs","Command_Buff_Spell#${i}"]}"
+    
+    /if (${Bool[${iter}]}) {
+      /if (${Me.Book[${iter}]}) {
+
+        /varset gl_comm_buffs[${i},1] "${Ini[${gl_bot_file},"Command_Buffs","Command_Buff_Spell#${i}"]}"
+        /varset gl_comm_buffs[${i},2] "${Ini[${gl_bot_file},"Command_Buffs","Command_Buff_Gem#${i}"]}"
+
+        /varset gl_num_comm_buffs ${i}
+      } else {
+
+        /echo "${iter} not found in book. Ignoring..."
+      }
+    }
+  /next i
+
+  /for i 1 to 4
+    
+    /varset iter "${Ini[${gl_bot_file},"Pet_Buffs","Pet_Buff_Spell#${i}"]}"
+       
+    /if (${Bool[${iter}]}) {
+      /if (${Me.Book[${iter}]}) {
+
+        /varset gl_pet_buffs[${i},1] "${Ini[${gl_bot_file},"Pet_Buffs","Pet_Buff_Spell#${i}"]}"
+        /varset gl_pet_buffs[${i},2] "${Ini[${gl_bot_file},"Pet_Buffs","Pet_Buff_Gem#${i}"]}"
+        /varset gl_pet_buffs[${i},3] "${Ini[${gl_bot_file},"Pet_Buffs","Pet_Buff_Owner#${i}"]}"
+
+        /varset gl_num_pet_buffs ${i}
+      } else {
+
+        /echo "${iter} not found in book. Ignoring..."
+      }
+    }
+  /next i
   
-    /if (${Bool[${iter}]}) {
-
-      /echo loading buffspell
-
-      /varset gl_const_buffs[${i},1] "${Ini[${gl_bot_file},"Constant_Buffs","Constant_Buff_Spell#${i}"]}"
-      /varset gl_const_buffs[${i},2] "${Ini[${gl_bot_file},"Constant_Buffs","Constant_Buff_Gem#${i}"]}"
-      /varset gl_const_buffs[${i},3] "${Ini[${gl_bot_file},"Constant_Buffs","Constant_Buff_Target#${i}"]}"
-
-      /varset gl_num_const_buffs ${i}
-    }
-
-  /next i
-
   /for i 1 to 4
-    
-    /varset iter ${Ini[${gl_bot_file},"Command_Buffs","Command_Buff_Spell#${i}"]}
-    
+       
     /if (${Bool[${iter}]}) {
+      /varset iter "${Ini[${gl_bot_file},"Area_of_Effect","AoE_Spell#${i}"]}"
+      
+      /if (${Me.Book[${iter}]}) {
 
-      /varset gl_comm_buffs[${i},1] "${Ini[${gl_bot_file},"Command_Buffs","Command_Buff_Spell#${i}"]}"
-      /varset gl_comm_buffs[${i},2] "${Ini[${gl_bot_file},"Command_Buffs","Command_Buff_Gem#${i}"]}"
+        /varset gl_aoes[${i},1] "${Ini[${gl_bot_file},"Area_of_Effect","AoE_Spell#${i}"]}"
+        /varset gl_aoes[${i},2] "${Ini[${gl_bot_file},"Area_of_Effect","AoE_Gem#${i}"]}"
 
-      /varset gl_num_comm_buffs ${i}
+        /varset gl_num_aoes ${i}
+      } else {
+
+        /echo "${iter} not found in book. Ignoring..."
+      }
     }
-
-  /next i
-
-  /for i 1 to 4
-    
-    /varset iter ${Ini[${gl_bot_file},"Pet_Buffs","Pet_Buff_Spell#${i}"]}
-    
-    /if (${Bool[${iter}]}) {
-
-      /varset gl_pet_buffs[${i},1] "${Ini[${gl_bot_file},"Pet_Buffs","Pet_Buff_Spell#${i}"]}"
-      /varset gl_pet_buffs[${i},2] "${Ini[${gl_bot_file},"Pet_Buffs","Pet_Buff_Gem#${i}"]}"
-      /varset gl_pet_buffs[${i},3] "${Ini[${gl_bot_file},"Pet_Buffs","Pet_Buff_Owner#${i}"]}"
-
-      /varset gl_num_pet_buffs ${i}
-    }
-
-  /next i
-  
-  /for i 1 to 4
-    
-    /varset iter ${Ini[${gl_bot_file},"Area_of_Effect","AoE_Spell#${i}"]}
-    
-    /if (${Bool[${iter}]}) {
-
-      /varset gl_aoes[${i},1] "${Ini[${gl_bot_file},"Area_of_Effect","AoE_Spell#${i}"]}"
-      /varset gl_aoes[${i},2] "${Ini[${gl_bot_file},"Area_of_Effect","AoE_Gem#${i}"]}"
-
-      /varset gl_num_aoes ${i}
-    }
-
   /next i
 
   /return
 }
 
-sub Check_Plugins() {
+sub check_plugins() {
   
   /if (!${Plugin[MQ2EQBC].Name.Length}) {
 

@@ -1,21 +1,23 @@
-#include IP_Macro_Commands.inc
+#include ip_commands.inc
 
-sub Check_Actions() {
+sub handle_actions() {
 
   /declare dbg bool local false
 
+  /if (${dbg}) /echo attack
+  /call Check_Attack
+  /if (${dbg}) /echo kill
+  /call Check_Kill_Target
   /if (${dbg}) /echo assist
-  /call Check_Assist
+  /call Check_Auto_Assist
   /if (${dbg}) /echo follow
   /call Check_Follow
   /if (${dbg}) /echo med
   /call Check_Med
-  /if (${dbg}) /echo combat
-  /call Check_Combat
   /if (${dbg}) /echo zone
   /call Check_Zone
 
-  /if (${Me.Moving} || ${gl_spldly} || ${Me.Invis} && !${gl_in_combat}) {
+  /if (${Me.Moving} || ${gl_spldly} || ${Me.Invis}) {
     /return
   }
 
@@ -31,7 +33,9 @@ sub Check_Actions() {
   /if (${dbg}) /echo hot
   /call Check_HoT
   /if (${Macro.Return}) /return
-  /if (${dbg}) /echo pheals
+  /if (${dbg}) /echo hot
+  /call Check_Heal_Group
+  /if (${Macro.Return}) /return
 
   /if (${dbg}) /echo area
   /call Check_AoE
@@ -59,8 +63,8 @@ sub Check_Actions() {
   /return
 } 
 
-sub Check_Assist() {
-    
+sub Check_Attack() {
+
   |-'Check for assist target'
   /if (${gl_assist_ID}) { 
 
@@ -83,14 +87,15 @@ sub Check_Assist() {
       |-'Melee attack'
       } else {
 
+        |-'Move to correct distance'
         /if (!${Stick.Active} || ${Stick.StickTarget} != ${gl_kill_ID}) {
 
           /declare stick_distance float local ${Spawn[ID ${gl_kill_ID}].MaxRangeTo}
 
           /if (${stick_distance} > 40) {
-            /varcalc stick_distance ${Spawn[ID ${gl_kill_ID}].MaxRangeTo} * 0.33
+            /varcalc stick_distance ${stick_distance} * 0.33
           } else {
-            /varcalc stick_distance ${Spawn[ID ${gl_kill_ID}].MaxRangeTo} * 0.60
+            /varcalc stick_distance ${stick_distance} * 0.60
           }
           
           /stick ID ${gl_kill_ID} ${stick_distance} moveback ${gl_assdir}
@@ -100,7 +105,7 @@ sub Check_Assist() {
         /if (!${NetBots[${Me.Name}].Attacking}) /attack on
 
         /declare abl  string  local 
-        /declare i    int   local
+        /declare i    int     local
 
         |-'Do all ready abilities'
         /for i 1 to ${gl_num_abilities}
@@ -113,6 +118,11 @@ sub Check_Assist() {
       }
     }
   }
+
+  /return
+}
+
+sub Check_Kill_Target() {
 
   |-'Check for kill target'
   /if (${gl_kill_ID}) {
@@ -130,10 +140,17 @@ sub Check_Assist() {
       /varset gl_kill_ID    0
       /varset gl_assist_ID  0
     }
+  } 
 
-  } else {
+  /return
+}
 
-    /if (${NetBots[${Me.Name}].Attacking}) {
+sub Check_Auto_Assist() {
+
+  |-'Check for auto-assist on active character'
+  /if (${NetBots[${Me.Name}].Attacking}) {
+
+    /if (!${gl_kill_ID}) {
 
       /if (${Target.Type.Equal["NPC"]}) {
 
@@ -141,7 +158,7 @@ sub Check_Assist() {
 
           /bc assist on ${Target.ID}
         }
-      }
+      } 
     }
   }
 
@@ -154,24 +171,24 @@ sub Check_Follow() {
 
     /if (${gl_is_following}) {
 
-      /if (${Spawn[ID ${gl_follow_ID}].ID}) {
+      /if (${Spawn[ID ${gl_follow_id}].ID} && ${Spawn[ID ${gl_follow_id}].Type.NotEqual["Corpse"]}) {
 
-        /if (${Spawn[ID ${gl_follow_ID}].Distance} < ${gl_comdis}) {
+        /if (${Spawn[ID ${gl_follow_id}].Distance} < ${gl_comdis}) {
+       
+          /if (${Target.ID} != ${gl_follow_id}) /squelch /target clear
 
-          /if (!${Stick.Active} || ${Stick.StickTarget} != ${gl_follow_ID}) {
+          /if (!${Stick.Active} || ${Stick.StickTarget} != ${gl_follow_id}) {
 
-            /if (${Spawn[ID ${gl_follow_ID}].Distance} > ${gl_lshdis}) {
+            /if (${Spawn[ID ${gl_follow_id}].Distance} > ${gl_lshdis}) {
               
-              /if (${Me.ID} == ${Target.ID}) /squelch /target clear
-
-              /stick ID ${gl_follow_ID} ${gl_foldis}
+              /stick ID ${gl_follow_id} ${gl_foldis}
             }
           }
           
         } else {
 
           /varset gl_is_following false
-          /varset gl_follow_ID 0
+          /varset gl_follow_id 0
 
           /stick off
         }
@@ -179,11 +196,11 @@ sub Check_Follow() {
       } else {
 
         /varset gl_is_following false
-        /varset gl_follow_ID 0
+        /varset gl_follow_id 0
 
         /stick off
       }
-    } else /if (${gl_follow_name.NotEqual["0"]}) {
+    } else /if (${Bool[${gl_follow_name}]}) {
 
       /call Follow ${Spawn[${gl_follow_name}].ID}
     }
@@ -198,16 +215,16 @@ sub Check_Med() {
     
     /if (${gl_damage_taken_timer}) {
 
-      /if (${Me.Sitting}) /stand
+      /if (${Me.Sitting}) /standdd
 
       /return
     }
 
-    /if (!${gl_is_following} || ${Spawn[ID ${gl_follow_ID}].Distance} <= ${gl_lshdis})  {
+    /if (!${gl_is_following} || ${Spawn[ID ${gl_follow_id}].Distance} <= ${gl_lshdis})  {
 
       /if (!${Me.Sitting}) {
 
-        /if (!${Corpse.Open} && !${Me.Casting.ID}) {
+        /if (!${Corpse.Open}) {
 
           /sit 
         }
@@ -222,33 +239,6 @@ sub Check_Med() {
   /return
 }
 
-sub Check_Combat() {
-
-  /declare cncbts   string  local   ${NetBots.Client}
-  /declare netbot   string  local   0
-  /declare i        int     local
-
-  /for i 1 to ${NetBots.Counts} 
-    
-    /varset netbot ${cncbts.Arg[${i}]}
-
-    /if (${Spawn[PC ${netbot}].ID} && ${Spawn[PC ${netbot}].Distance} < ${gl_comdis}) {
-
-      /if (${NetBots[${netbot}].CombatState} == 0) {
-
-        /varset gl_cmbtmr 30s
-        /varset gl_in_combat true
-
-        /return
-      } 
-    }
-  /next i
-
-  /if (!${gl_cmbtmr}) /varset gl_in_combat false
-
-  /return 
-}
-
 sub Check_Zone() {
   
   /if (${gl_current_zone.NotEqual[${Zone.Name}]}) {
@@ -256,14 +246,10 @@ sub Check_Zone() {
     /varset gl_current_zone   ${Zone.Name}
     /varset gl_kill_ID        0
     /varset gl_assist_ID      0
-    /varset gl_follow_ID      0
-    /varset gl_in_combat      false
-    /varset gl_is_auto_active false
+    /varset gl_follow_id      0
 
     /stick off
     /attack off
-
-    /if (${gl_iscstr}) /loadspells jim
 
     /if (${Me.Class.Name.Equal["Bard"]}) {
 
@@ -278,10 +264,10 @@ sub Check_Group_Heal() {
   
   /if (${Bool[${gl_ghlspl}]}) {
 
-    /declare cncbts   string  local   ${NetBots.Client}
-    /declare netbot   string  local   0
-    /declare helcnt   int   local 0
-    /declare i      int   local
+    /declare cncbts   string  local ${NetBots.Client}
+    /declare netbot   string  local 0
+    /declare helcnt   int     local 0
+    /declare i        int     local
 
     /for i 1 to ${NetBots.Counts} 
       
@@ -319,7 +305,7 @@ sub Check_Complete_Heal() {
     /declare netbot   string  local   0
     /declare lwstpc   int   local   100 
     /declare hltgid   int   local   
-    /declare i      int   local
+    /declare i        int   local
 
     /for i 1 to ${NetBots.Counts} 
       
@@ -354,11 +340,11 @@ sub Check_Target_Heal() {
 
   /if (${Bool[${gl_thlspl}]}) {
 
-    /declare cncbts   string  local   ${NetBots.Client}
-    /declare netbot   string  local   0
-    /declare lwstpc   int   local   100 
-    /declare hltgid   int   local   
-    /declare i      int   local
+    /declare cncbts string  local   ${NetBots.Client}
+    /declare netbot string  local   0
+    /declare lwstpc int     local   100 
+    /declare hltgid int     local   
+    /declare i      int     local
 
     /for i 1 to ${NetBots.Counts}     
 
@@ -403,9 +389,9 @@ sub Check_HoT() {
     /declare cncbts   string  local   ${NetBots.Client}
     /declare hotsid   string  local   ${Spell[${gl_hotspl}].ID}
     /declare netbot   string  local   0
-    /declare lwstpc   int   local   100 
-    /declare hltgid   int   local   
-    /declare i      int   local
+    /declare lwstpc   int     local   100 
+    /declare hltgid   int     local   
+    /declare i        int     local
 
     /for i 1 to ${NetBots.Counts} 
       
@@ -429,14 +415,45 @@ sub Check_HoT() {
 
       /if (${Me.Pet.PctHPs} < ${lwstpc}) {
 
-      /varset lwstpc ${Me.Pet.PctHPs}
-      /varset hltgid ${Me.Pet.ID}
+        /varset lwstpc ${Me.Pet.PctHPs}
+        /varset hltgid ${Me.Pet.ID}
       }
     }
 
     /if (${lwstpc} < ${gl_hotpct}) {
 
       /call Cast ${gl_hotspl} ${gl_hotgem} ${hltgid}
+
+      /return ${Macro.Return}
+    }
+  }
+  
+  /return 0
+}
+
+sub Check_Heal_Group() {
+
+  /if (${gl_heloth} && ${Bool[${gl_thlspl}]}) {
+
+    /declare lwstpc int     local   100 
+    /declare hltgid int     local   
+    /declare i      int     local
+
+    /for i 0 to ${Group} 
+    
+      /if (${Group.Member[${i}].PctHPs} != 0 && ${Group.Member[${i}].PctHPs} < ${lwstpc}) {
+        /if (${Group.Member[${i}].ID} && ${Group.Member[${i}].Distance} < ${gl_spldis}) {
+          /varset lwstpc ${Group.Member[${i}].PctHPs}
+          /varset hltgid ${Group.Member[${i}].ID}
+        }
+      }
+    /next i
+
+
+    /if (${lwstpc} < ${gl_thlpct} && ${Me.CurrentMana} > ${Spell[${gl_thlspl}].Mana} * 1.3) {
+
+      /bc Attemping to heal ${Spawn[${hltgid} ID].Name}
+      /call Cast ${gl_thlspl} ${gl_thlgem} ${hltgid}
 
       /return ${Macro.Return}
     }
@@ -565,7 +582,7 @@ sub Check_Pet_Buffs() {
 
 sub Check_Cannibalize() {
 
-  /if (${gl_iscstr} && ${gl_in_combat}) {
+  /if (${gl_iscstr} && ${gl_combat_timer}) {
 
     /if (${Me.PctMana} < 90 && ${Me.PctHPs} > 60) {
         

@@ -34,7 +34,7 @@ sub Buff(int buff_target_ID) {
 
 		/if (${Spawn[ID ${ID}].ID} && ${Spawn[ID ${ID}].Distance} < ${gl_spldis}) {
 
-			/bc Buffing ${Spawn[ID ${ID}].Name}.
+			/bc Buffing ${Spawn[ID ${ID}].Name}...
 
 			/declare i int local
 
@@ -53,9 +53,7 @@ sub Buff(int buff_target_ID) {
 
 			/next i
 
-			/loadspells ${gl_spell_set_name}
-
-			/bc Done buffing ${Spawn[ID ${ID}].Name}.
+			/bc Done buffing ${Spawn[ID ${ID}].Name}...
 		}
 	} 
 
@@ -81,36 +79,34 @@ sub Cast(string spell_name, int gem_number, int target_ID) {
 	/declare ydiff			float local 0.0
 	/declare waitcount 	int 	local 0
 
-
 	/if (${Me.CurrentMana} < ${Spell[${spell_name}].Mana} * 1.3) {
 
 		/bc Not enough mana to cast.
-
 		/varset gl_spldly 20
-
 		/interrupt
 		/return 0
 	}
 
-	/if (${gl_is_following} && ${Spawn[ID ${gl_follow_ID}].Distance} > ${gl_lshdis}) {
+	/if (!${gl_combat_timer} && ${gl_is_following} && ${Spawn[ID ${gl_follow_id}].ID} && ${Spawn[ID ${gl_follow_id}].Distance} > ${gl_lshdis}) {
 
 		/bc Interrupting spell cast -- follow target needs me.
+		/tar ID ${gl_follow_id}
+		/stick
 		/squelch /target clear
 		/interrupt
 		/return 0
 	}
 
 	/call Memorize "${spell_name}" ${gem_number} 	
-	/if (${Macro.Return}) /return 0
 
 	:Wait
 	
 	/if (!${Me.SpellReady[${spell_name}]}) {
 
-		/if (${waitcount} < 20) {
+		/if (${waitcount} < 100) {
 			
 			/varcalc waitcount ${waitcount} + 1
-			/delay 5
+			/delay 1
 			/goto :Wait
 
 		} else {
@@ -147,7 +143,7 @@ sub Cast(string spell_name, int gem_number, int target_ID) {
 			/return 0
 		} 
 
-		/if (${gl_is_following} && ${Spawn[ID ${gl_follow_ID}].Distance} > ${gl_lshdis}) {
+		/if (!${gl_combat_timer} && ${gl_is_following} && ${Spawn[ID ${gl_follow_id}].ID} && ${Spawn[ID ${gl_follow_id}].Distance} > ${gl_lshdis}) {
 
 			/bc Interrupting spell cast -- follow target needs me.
 			/squelch /target clear
@@ -179,22 +175,27 @@ sub Cast(string spell_name, int gem_number, int target_ID) {
 	}
 }
 
-sub Follow(int follow_ID) {
+sub Follow(int follow_id) {
 
 	|-'Never follow yourself'
-	/if (${follow_ID} == ${Me.ID}) {
+	/if (${follow_id} == ${Me.ID}) {
 
-		/varset gl_follow_ID 0
+		/varset gl_follow_name 	"0"
+		/varset gl_follow_id 		0
 		/varset gl_is_following false
+		/varset gl_kill_ID      0 
+		/varset gl_assist_ID    0 		
+
+		/squelch /stick off
+
 		/return
 	}
 
-
 	|-'Proximity check'
-	/if (${Spawn[ID ${follow_ID}].ID} && ${Spawn[ID ${follow_ID}].Distance} < ${gl_comdis}) {
+	/if (${Spawn[ID ${follow_id}].ID} && ${Spawn[ID ${follow_id}].Distance} < ${gl_comdis}) {
 		
 		|-'Do not follow corpses'
-		/if (!${Spawn[ID ${follow_ID}].Type.Equal["Corpse"]}) {
+		/if (!${Spawn[ID ${follow_id}].Type.Equal["corpse"]}) {
 
 			/varset gl_kill_ID 		0
 			/varset gl_assist_ID 	0
@@ -204,10 +205,10 @@ sub Follow(int follow_ID) {
 			/attack off
 
 			/varset gl_is_following true
-			/varset gl_follow_ID ${follow_ID}
-			/varset gl_follow_name ${Spawn[ID ${gl_follow_ID}].Name}		
+			/varset gl_follow_id    ${follow_id}
+			/varset gl_follow_name  ${Spawn[ID ${gl_follow_id}].Name}		
 
-			/stick ID ${gl_follow_ID} ${gl_foldis}
+			/stick ID ${gl_follow_id} ${gl_foldis}
 		}
 	}
 
@@ -222,11 +223,14 @@ sub Memorize(string spell_name, int gem_number) {
 
 		/memspell ${gem_number} "${spell_name}"
 
+		/declare timeout int local 0
+
 		:Memorizing
 
-		/if (${Me.Gem[${spell_name}]} != ${gem_number}) {
+		/if (${Me.Gem[${spell_name}]} != ${gem_number} && ${timeout} < 150) {
 
 			/delay 5
+			/varcalc timeout ${timeout} + 5
 			/goto :Memorizing
 		}
 		
@@ -238,35 +242,115 @@ sub Memorize(string spell_name, int gem_number) {
 	/return 0
 }
 
+sub Speak(int id, string msg) {
+
+	/if (${Spawn[ID ${id}].ID} && ${Spawn[ID ${id}].Distance} < ${gl_comdis}) {
+
+		/declare timeout int local 0
+
+		:MoveToTarget
+
+		/if (${Spawn[ID ${id}].Distance} > ${gl_spkdis}) {
+
+			/moveto ID ${id}
+			/delay 5
+			/varcalc timeout ${timeout} + 5
+
+			/if (${timeout} > 50) {
+				/bc 'I could not reach my speak target'
+				/stick off
+				/goto :Break
+			}
+
+			/goto :MoveToTarget
+		}
+
+		/tar ID ${id}
+		
+		/delay 1
+
+		/hail
+		/say ${msg}	
+	}
+
+	:Break
+
+	/return
+}
+
 sub Stop() {
 
-	/varset gl_follow_name  0
-	/varset gl_follow_ID 		0
+	/varset gl_follow_name  "0"
+	/varset gl_follow_id 		0
 	/varset gl_is_following false
+	/varset gl_kill_ID      0 
+	/varset gl_assist_ID    0 
+
 	
 	/squelch /stick off
 
 	/return
 }
 
-sub Use_Item(string item_name) {
+sub Toggle_Meditate() {
 
-	/if (${FindItem[${item_name}].InvSlot}) {
+	/if (${gl_shdmed}) {
 
-		/declare sleep_time float local
+		/if (${gl_is_medding}) {
 
-		/itemnotify ${FindItem[${item_name}].InvSlot} rightmouseup
+			/stand
+		
+			/varset gl_is_medding false
 
-		/varcalc sleep_time ${FindItem[${item_name}].CastTime} + 0.5
+			/bc I am no longer meditating...
 
-		/interrupt
+		} else {
 
-		/delay ${sleep_time}
-	
-	} else {
+			/varset gl_is_medding true
 
-		/echo Could not find an item matching '${item_name}'.
+			/bc I am meditating...
+		}
 	}
 
 	/return
+}
+
+sub Use_Item(string item_name) {
+	
+  /if (${FindItem[${item_name}].Name.NotEqual["NULL"]}) {
+
+  	/if (${FindItem[${item_name}].EffectType.Find["click"]} == 1) {
+
+  		/if (${FindItem[${item_name}].Timer} == 0) {
+  		
+  		  /stick off
+  		  /interrupt
+
+				:Casting
+				/itemnotify ${FindItem[${item_name}].InvSlot} rightmouseup
+				/delay 5
+				
+				/if (${FindItem[${item_name}].CastTime} > 0) {
+
+					/delay 1
+
+					/if (${Me.Casting.ID}) /goto :Casting
+
+				} 
+			} else {
+
+  			/echo '${item_name} is not ready.'
+  		}
+
+  	} else {
+
+  		/echo '${item_name} does not have a clickable effect.'
+  	}
+
+  } else {
+
+		/echo 'Could not find an item matching ${item_name}'
+	}
+
+	/return 0
 }

@@ -1,40 +1,4 @@
-
-sub Check_Events() {
-	
-	/doevents AA_Percent
-	/doevents Accept_Group
-	/doevents Accept_Raid
-	/doevents AoE
-	/doevents Assist
-	/doevents Buff
-	/doevents Buff_Request
-	/doevents Character_Flag
-	/doevents Click
-	/doevents Cure
-	/doevents Debuff
-	/doevents Disband
-	/doevents End_Enrage
-	/doevents End_Macro
-	/doevents Find_Window_Text
-	/doevents Follow
-	/doevents Gate
-	/doevents Invis
-	/doevents Invite_Instance
-	/doevents Loot
-	/doevents Med
-	/doevents PetAssist
-	/doevents Rez
-	/doevents Speak
-	/doevents Start_Enrage
-	/doevents Stop
-	/doevents Stuns
-	/doevents Summon_Pet
-	/doevents Take_Damage
-	/doevents Use_Item
-	/doevents Warp
-
-	/return
-}
+#include ip_commands.inc
 
 #event AA_Percent "<#*#> aa #1#"
 sub Event_AA_Percent(string line, int percent) {
@@ -44,20 +8,20 @@ sub Event_AA_Percent(string line, int percent) {
 	/return
 }
 
-#event Accept_Group "#*# invites you to join a group."
-sub Event_Accept_Group(string line) {
+#event Accept_Group "#1# invites you to join a group."
+sub Event_Accept_Group(string line, string player) {
 
-	/bc Joining group...
+	/bc Joining group of ${player}...
 	/tar clear
 	/invite
 
 	/return
 }
 
-#event Accept_Raid "#*# invites you to join a raid."
-sub Event_Accept_Raid(string line) {
+#event Accept_Raid "#1# invites you to join a raid."
+sub Event_Accept_Raid(string line, string player) {
 
-	/bc Joining raid...
+	/bc Joining raid of ${player}...
 	/raidaccept
 
 	/return
@@ -93,7 +57,7 @@ sub Event_Assist(string line, string sender, int target_ID) {
 sub Event_Buff_Request(string line, string buff_target) {
 
 	/declare buff_target_ID 	int local -1
-	/declare i 									int local
+	/declare i 								int local
 
 	/for i 1 to 100
 
@@ -106,7 +70,7 @@ sub Event_Buff_Request(string line, string buff_target) {
 
 	/if (${buff_target_ID} == -1) {
 
-		/bc 'Could not find buff target: ${buff_target}'
+		/bc Could not find buff target: ${buff_target}...
 	}
 
 	/return
@@ -147,16 +111,6 @@ sub Event_Click(string line) {
 	/return
 }
 
-#event Cure "#1# tells the group, '$cure#*#"
-sub Event_Cure(string line, string name) {	
-
-	/bc ${name.Arg[2,1]}
-	/bc ${Spawn[PC ${name.Arg[2,1]}]}
-	/call Cast "Eradicate Disease" 8 ${Spawn[PC line.Arg[1, ' ']]}
-
-	/return
-}
-
 #event Debuff "<#*#> debuffs on #1#"
 sub Event_Debuff(string line, int target_ID) {
 
@@ -180,6 +134,8 @@ sub Event_Debuff(string line, int target_ID) {
 
 #event Disband "<#*#> disband"
 sub Event_Disband(string line) {
+
+	/echo disbanding
 
 	/if (${Raid.Members}) /raiddisband
 
@@ -229,10 +185,33 @@ sub Event_Find_Window_Text(string line, string text) {
 	/return
 }
 
-#event Follow "<#*#> follow #1#"
-sub Event_Follow(string line, int follow_ID) {
+#event Export_Active_Windows "<#*#> expactwin"
+sub Event_Export_Active_Windows(string line, string text) {
 
-	/call Follow ${follow_ID}
+	/declare i 						int 		local 1
+	/declare window_name 	string 	local ""
+
+	:Iterate
+
+  /varset window_name ${Ini[${gl_window_file},"Window_Names","Window_Name#${i}"]}
+
+	/if (${window_name.NotEqual[NULL]}) {
+
+		/if (${Window[${window_name}].Height} > 400) /ini "Data\${Me.Name}_activewin.ini" "Windows" "Name${i}" "${window_name}"
+
+		/varcalc i ${i} + 1
+		/goto :Iterate
+	}
+
+	/echo "Export complete."
+
+	/return
+}
+
+#event Follow "<#*#> follow #1#"
+sub Event_Follow(string line, int follow_id) {
+
+	/call Follow ${follow_id}
 	
 	/return
 }
@@ -268,38 +247,6 @@ sub Event_Invis(string line) {
 	/return
 }
 
-#event Invite_Instance "<#1#> inst"
-sub Event_Invite_Instance(string line, string inviter) {
-
-	/if (${Me.Name.Equal[${inviter}]}) {
-
-	  /declare cncbts   string  local ${NetBots.Client}
-	  /declare netbot 	string 	local 
-	  /declare i        int     local
-
-	  /for i 1 to ${NetBots.Counts} 
-	    
-	    /varset netbot ${cncbts.Arg[${i}]}
-
-	    /if (${NetBots[${netbot}].ID} != ${Me.ID}) {
-	
-		    /bct ${netbot} //notify LargeDialogWindow LDW_OKButton leftmouseup
-		    /delay 1
-	
-	    	/say #invite ${netbot}
-
-	    	/delay 1
-		    /bct ${netbot} //notify LargeDialogWindow LDW_YesButton leftmouseup
-	    } 
-
-	    :ClickYes
-	    
-	  /next i
-	}
-
-	/return
-}
-
 #event Loot "<#*#> loot"
 sub Event_Loot(string line) {
 
@@ -307,7 +254,7 @@ sub Event_Loot(string line) {
 			
 		/if (${NearestSpawn[Corpse ${Me.Name}].Distance} < ${gl_spldis}) {
 
-			/declare i 		int local
+			/declare i 		  int local
 			/declare numitm int local	
 			/declare count 	int local
 
@@ -315,13 +262,13 @@ sub Event_Loot(string line) {
 
 			/tar ID ${NearestSpawn[Corpse ${Me.Name}].ID}
 
-			/delay 10
-
 			/corpse
+
+			/delay 4
 
 			/loot
 
-			/delay 10
+			/delay 4
 
 			/varset numitm ${Corpse.Items}
 
@@ -359,8 +306,10 @@ sub Event_Loot(string line) {
 
 			:DoneLooting
 
-			/delay 1s
+			/delay 4
 
+			/notify LootWnd DoneButton leftmouseup
+			/notify LootWnd DoneButton leftmouseup
 			/notify LootWnd DoneButton leftmouseup
 		}
 	}
@@ -371,23 +320,7 @@ sub Event_Loot(string line) {
 #event Med "<#*#> med"
 sub Event_Med(string line) {
 
-	/if (${gl_shdmed}) {
-
-		/if (${gl_is_medding}) {
-
-			/stand
-		
-			/varset gl_is_medding false
-
-			/bc I am no longer meditating.
-
-		} else {
-
-			/varset gl_is_medding true
-
-			/bc I am meditating.
-		}
-	}
+	/call Toggle_Meditate
 	
 	/return
 }
@@ -429,25 +362,7 @@ sub Event_Rez(string line, int target_ID) {
 #event Speak "<#*#> speak #1# #2#"
 sub Event_Speak(string line, int speak_ID, string message) {	
 
-	/if (${Spawn[ID ${speak_ID}].ID} && ${Spawn[ID ${speak_ID}].Distance} < ${gl_comdis}) {
-
-		:MoveToTarget
-
-		/if (${Spawn[ID ${speak_ID}].Distance} > ${gl_spkdis}) {
-
-			/moveto ID ${speak_ID}
-			/delay 5
-
-			/goto :MoveToTarget
-		}
-
-		/tar ID ${speak_ID}
-		
-		/delay 1
-
-		/hail
-		/say ${message}	
-	}
+	/call Speak ${speak_ID} "${message}"
 
 	/return
 }
@@ -493,36 +408,39 @@ sub Event_Summon_Pet(string line) {
 	/return
 }
 
-#event Take_Damage "#1# YOU for #*# points of damage."
-sub Event_Take_Damage(string line) {
+#event took_damage "#*# YOU for #*#"
+sub event_took_damage(string line) {
+	
+	/if (${Me.AbilityReady["Feign Death"]}) {
 
-	/if (!${gl_istank}) {
+		/doability "Feign Death"
+		/delay 5
+		/stand
 
-		/bc i have agro
+		/if (${Target.ID} && ${gl_assist_ID} != 0) /attack on
 
-		/if (${Me.AbilityReady["Feign Death"]}) {
+	} else /if (${Me.AbilityReady["Hide"]}) {
+		
+		/bc im here
 
-			/doability "Feign Death"
-			/delay 5
-			/stand
+		/attack off
+		/delay 5
+		/doability "Hide"
+		/delay 5
 
-			/if (${Target.ID} && ${gl_assist_ID} != 0) /attack on
-
-		} else /if (${Me.AbilityReady["Hide"]}) {
-			
-			/bc im here
-
-			/attack off
-			/delay 5
-			/doability "Hide"
-			/delay 5
-
-			/if (${Target.ID} && ${gl_assist_ID} != 0) /attack on
-		}
-
-		/varset gl_damage_taken_timer 0s
+		/if (${Target.ID} && ${gl_assist_ID} != 0) /attack on
 	}
 
+	/varset gl_damage_taken_timer 6s
+	/bc [note0]
+
+	/return
+}
+
+#event notify_combat "#*#[note0]"
+sub event_notify_combat(string line) {
+
+  /varset gl_combat_timer 6s
 	/return
 }
 

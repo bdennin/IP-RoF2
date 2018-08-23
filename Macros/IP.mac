@@ -1,30 +1,24 @@
 
 #turbo 20
 
-#include IP_Macro_Actions.inc
-#include IP_Macro_Auto.inc
-#include IP_Macro_Commands.inc
-#include IP_Macro_Events.inc
-#include IP_Macro_Setup.inc
+#include ip_actions.inc
+#include ip_commands.inc
+#include ip_events.inc
+#include ip_setup.inc
+#include ip_class_templates.inc
 
-#include IP_Templates.inc
-
-sub Main() {
+sub main() {
 	
-	/call "Setup"
-	/call "Automation_Setup"
+	/call setup_macro
 
 	/echo IP loaded.
 
-	:Main
+	:main
 
-	/call "Check_Events"
-	/call "Check_Actions"
-	/call "Automation_Loop"
+	/doevents
+	/call handle_actions
 	
-	/delay 1
-
-	/goto :Main
+	/goto :main
 
 	/return
 }
