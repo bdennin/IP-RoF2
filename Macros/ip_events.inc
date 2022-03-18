@@ -44,7 +44,7 @@ sub Event_AoE(string line) {
 	/return
 }
 
-#event Assist "<#1#> assist on #2#"
+#event Assist "<#1#> assist #2#"
 sub Event_Assist(string line, string sender, int target_ID) {
 
 	/call Assist ${Spawn[${sender}].ID} ${target_ID}
@@ -417,7 +417,7 @@ sub event_took_damage(string line) {
 		/delay 5
 		/stand
 
-		/if (${Target.ID} && ${gl_assist_ID} != 0) /attack on
+		/if (${Target.ID} && ${gl_assist_id} != 0) /attack on
 
 	} else /if (${Me.AbilityReady["Hide"]}) {
 		
@@ -428,7 +428,7 @@ sub event_took_damage(string line) {
 		/doability "Hide"
 		/delay 5
 
-		/if (${Target.ID} && ${gl_assist_ID} != 0) /attack on
+		/if (${Target.ID} && ${gl_assist_id} != 0) /attack on
 	}
 
 	/varset gl_damage_taken_timer 6s
@@ -454,8 +454,6 @@ sub Event_Use_Item(string line, string item_name) {
 
 #event Warp "<#1#> warp #2#"
 sub Event_Warp(string line, string sender, int warp_ID) {
-
-	/if (${Spawn[PC ${sender}].ID} == ${Me.ID}) /return
 
 	/if (${Spawn[PC ${sender}].ID}) {
 

@@ -22,8 +22,8 @@ sub setup_variables() {
 
   /if (!${Defined[gl_follow_name]})   /declare gl_follow_name   string  global "0"
   /if (!${Defined[gl_follow_id]})     /declare gl_follow_id     int     global 0
-  /if (!${Defined[gl_kill_ID]})       /declare gl_kill_ID       int     global 0
-  /if (!${Defined[gl_assist_ID]})     /declare gl_assist_ID     int     global 0
+  /if (!${Defined[gl_kill_id]})       /declare gl_kill_id       int     global 0
+  /if (!${Defined[gl_assist_id]})     /declare gl_assist_id     int     global 0
   /if (!${Defined[gl_is_following]})  /declare gl_is_following  bool    global false
   /if (!${Defined[gl_is_medding]})    /declare gl_is_medding    bool    global false
 
@@ -106,9 +106,9 @@ sub setup_class() {
   /declare gl_chlgem    string  outer
   /declare gl_chlpct    int     outer   
 
-  /declare gl_thlspl    string  outer
+  /declare gl_target_heal_spell_name    string  outer
   /declare gl_thlgem    string  outer
-  /declare gl_thlpct    int   outer   
+  /declare gl_target_heal_percent    int   outer   
 
   /declare gl_hotspl    string  outer   
   /declare gl_hotgem    string  outer
@@ -207,9 +207,9 @@ sub setup_class() {
   /if (${Bool[${iter}]}) {
     /if (${Me.Book[${iter}]}) {
   
-      /varset gl_thlspl "${Ini[${gl_bot_file},"Target_Heal","Target_Heal_Spell"]}"
+      /varset gl_target_heal_spell_name "${Ini[${gl_bot_file},"Target_Heal","Target_Heal_Spell"]}"
       /varset gl_thlgem "${Ini[${gl_bot_file},"Target_Heal","Target_Heal_Gem"]}"
-      /varset gl_thlpct ${Ini[${gl_bot_file},"Target_Heal","Target_Heal_Percent"]}
+      /varset gl_target_heal_percent ${Ini[${gl_bot_file},"Target_Heal","Target_Heal_Percent"]}
     } else {    
 
       /echo "${iter} not found in book. Ignoring..."

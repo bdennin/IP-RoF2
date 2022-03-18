@@ -8,9 +8,11 @@ sub Assist(int sender_ID, int target_ID) {
 		/if (${Spawn[ID ${target_ID}].Type.Equal["NPC"]}) {
 
 			|-'Only set the assist for bots'
-			/if (${Me.ID} != ${sender_ID}) /varset gl_assist_ID ${sender_ID}
+			/if (${Me.ID} != ${sender_ID}) /varset gl_assist_id ${sender_ID}
 
-			/varset gl_kill_ID ${target_ID} 
+			/squelch /stick off
+
+			/varset gl_kill_id ${target_ID} 
 
 			|-'Have pets attack'
 			/if (${Me.Pet.ID}) {
@@ -83,16 +85,6 @@ sub Cast(string spell_name, int gem_number, int target_ID) {
 
 		/bc Not enough mana to cast.
 		/varset gl_spldly 20
-		/interrupt
-		/return 0
-	}
-
-	/if (!${gl_combat_timer} && ${gl_is_following} && ${Spawn[ID ${gl_follow_id}].ID} && ${Spawn[ID ${gl_follow_id}].Distance} > ${gl_lshdis}) {
-
-		/bc Interrupting spell cast -- follow target needs me.
-		/tar ID ${gl_follow_id}
-		/stick
-		/squelch /target clear
 		/interrupt
 		/return 0
 	}
@@ -181,10 +173,10 @@ sub Follow(int follow_id) {
 	/if (${follow_id} == ${Me.ID}) {
 
 		/varset gl_follow_name 	"0"
-		/varset gl_follow_id 		0
+		/varset gl_follow_id    0
 		/varset gl_is_following false
-		/varset gl_kill_ID      0 
-		/varset gl_assist_ID    0 		
+		/varset gl_kill_id      0 
+		/varset gl_assist_id    0 		
 
 		/squelch /stick off
 
@@ -197,8 +189,8 @@ sub Follow(int follow_id) {
 		|-'Do not follow corpses'
 		/if (!${Spawn[ID ${follow_id}].Type.Equal["corpse"]}) {
 
-			/varset gl_kill_ID 		0
-			/varset gl_assist_ID 	0
+			/varset gl_kill_id 		0
+			/varset gl_assist_id 	0
 
 			/interrupt
 
@@ -283,8 +275,8 @@ sub Stop() {
 	/varset gl_follow_name  "0"
 	/varset gl_follow_id 		0
 	/varset gl_is_following false
-	/varset gl_kill_ID      0 
-	/varset gl_assist_ID    0 
+	/varset gl_kill_id      0 
+	/varset gl_assist_id    0 
 
 	
 	/squelch /stick off
